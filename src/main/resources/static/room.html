@@ -81,10 +81,10 @@
 </div>
 
 <script>
-<!--    websocket = new WebSocket('ws://localhost:4396/fromRoomToStart');-->
+<!--    websocket = new WebSocket('ws://localhost:4396/room');-->
 
     let deviceId = localStorage.getItem("deviceId") || generateDeviceId(); // 获取生成的设备Id
-    let websocket = new WebSocket(`ws://localhost:4396/fromRoomToStart?deviceId=${deviceId}`);
+    let websocket = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
 
 
     websocket.onmessage = function(event) {
@@ -138,15 +138,14 @@
     }
 
     websocket.onopen = function() {
-            console.log('WebSocket connection opened - fromRoomToStart');
+            console.log('WebSocket connection opened - room');
         };
     websocket.onclose = function() {
-        console.log('WebSocket connection closed - fromRoomToStart');
+        console.log('WebSocket connection closed - room');
         websocket = null;
     };
     websocket.onerror = function(error) {
         console.error('WebSocket error:', error);
-        alert("连接服务器失败，请检查网络或稍后再试。");
         // 隐藏加载提示并恢复按钮状态
         document.getElementById("loadingMessage").style.display = "none";
         document.getElementById("joinBtn").disabled = false;
@@ -201,14 +200,6 @@
         return nickname;
     }
 
-<!--    // 生成随机设备ID（也可以替换为更复杂的生成逻辑）-->
-<!--    function generateDeviceId() {-->
-<!--        // 使用 uuid v4 生成唯一的设备ID-->
-<!--        const uuidv4 = require('uuid').v4;-->
-<!--        var id = uuidv4();-->
-<!--        localStorage.setItem("deviceId", id);  // 存储设备ID-->
-<!--        return id;-->
-<!--    }-->
     window.onbeforeunload = function () {
         if (websocket && websocket.readyState === WebSocket.OPEN) {
             websocket.close();

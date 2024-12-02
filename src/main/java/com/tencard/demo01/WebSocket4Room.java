@@ -14,8 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
 import static com.tencard.demo01.GameUtil.sendMessage;
 
@@ -24,7 +22,7 @@ import static com.tencard.demo01.GameUtil.sendMessage;
  * yue 2021/8/17
  */
 @Component
-@ServerEndpoint("/fromRoomToStart")
+@ServerEndpoint("/room") // 改为room
 @Slf4j
 public class WebSocket4Room {
 
@@ -51,23 +49,23 @@ public class WebSocket4Room {
         if (deviceId != null) {
             // 将 deviceId 与 session 映射存储
             deviceId2SessionMap_Room.put(deviceId, session);
-            log.info("Device ID: {} connected with session ID: {}", deviceId, session.getId());
+            log.info("/room - Device ID: {} connected with session ID: {}", deviceId, session.getId());
         } else {
-            log.warn("No deviceId found in the connection request");
+            log.warn("/room - No deviceId found in the connection request");
         }
     }
 
     @OnClose
     public void onClose(Session session) {
-        log.info("xxxxxxxxxxx   要清掉一个session数据辣 sessionId: {}  xxxxxxxxxxx ",session.getId());
+        log.info("/room xxxxxxxxxxx   要清掉一个session数据辣 sessionId: {}  xxxxxxxxxxx ",session.getId());
         // 查找对应的 deviceId
         String deviceId = findDeviceIdBySession(session);
         if (deviceId != null) {
             // 移除 session
             deviceId2SessionMap_Room.remove(deviceId);
-            log.info("Device ID: {} disconnected. Removed from deviceId2SessionMap", deviceId);
+            log.info("/room - Device ID: {} disconnected. Removed from deviceId2SessionMap", deviceId);
         } else {
-            log.warn("Session closed, but deviceId not found. Could not remove from deviceId2SessionMap");
+            log.warn("/room - Session closed, but deviceId not found. Could not remove from deviceId2SessionMap");
         }
     }
 
@@ -83,14 +81,14 @@ public class WebSocket4Room {
 
     @OnMessage
     public void onMessage(String message, Session session) throws IOException {
-        log.info("message内容为：{} ", message);
+        log.info("/room - message内容为：{} ", message);
         User user = JSON.parseObject(message, User.class);
         if (user.deviceId == null || user.roomCode == null) return;
 //        user.setNickName("xiaohua");
         user.setWinRate(49);
         user.setSession(session);
         user.setSessionId(session.getId());
-        log.info("======== user为：{} =========== ", user);
+        log.info("/room ======== user为：{} =========== ", user);
         if (roomCode2RoomIdMap.containsKey(user.roomCode)) { // 已经创建过房间
             // 红色方
             user.setRole(GameUtil.RoleEnum.redSide.toString());
@@ -108,7 +106,7 @@ public class WebSocket4Room {
                  * 这里的逻辑是：1.红色方的room.html接到信息，它跳转到游戏画面展示双方信息
                  *            2.蓝色方(房主)在游戏页面接收到websocket的onmessage对手信息，要显示敌方信息
                  *  */
-                log.info("---------- java room 发送消息 sessionId: {},userRole:{}", e.session.getId(), e.role);
+                log.info("/room ---------- 发送消息 sessionId: {},userRole:{}", e.session.getId(), e.role);
                 sendMessage(e.session, users);
             }
 
@@ -129,12 +127,12 @@ public class WebSocket4Room {
     private void updateBluePlayerSessionData(Map<Long, List<User>> roomId2UserListMap, Long roomId) {
         try{
             User red = roomId2UserListMap.get(roomId).stream().findFirst().get();
-            log.info("////////////// 房主 {} 之前的sessionid是 {}",roomId2UserListMap.get(roomId).stream().findFirst().get().deviceId,roomId2UserListMap.get(roomId).stream().findFirst().get().session.getId());
+            log.info("/room ////////////// 房主 {} 之前的sessionid是 {}",roomId2UserListMap.get(roomId).stream().findFirst().get().deviceId,roomId2UserListMap.get(roomId).stream().findFirst().get().session.getId());
             red.setSession(deviceId2SessionMap_Room.get(red.deviceId));
-            log.info("////////////// 房主 {} 之后的sessionid是 {}",roomId2UserListMap.get(roomId).stream().findFirst().get().deviceId,roomId2UserListMap.get(roomId).stream().findFirst().get().session.getId());
+            log.info("/room ////////////// 房主 {} 之后的sessionid是 {}",roomId2UserListMap.get(roomId).stream().findFirst().get().deviceId,roomId2UserListMap.get(roomId).stream().findFirst().get().session.getId());
 
         }catch (Exception e){
-            log.error("//////////////  updateBluePlayerSessionData error : {}",e.toString());
+            log.error("/room //////////////  updateBluePlayerSessionData error : {}",e.toString());
         }
     }
 }

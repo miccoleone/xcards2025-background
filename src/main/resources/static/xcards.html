@@ -96,9 +96,9 @@
         console.log('websocket connection opened - websocket ');
     }
     // 创建房间控制 WebSocket连接
-    websocket4Room = new WebSocket(`ws://localhost:4396/fromRoomToStart?deviceId=${deviceId}`);
+    websocket4Room = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
     websocket4Room.onopen = function() {
-        console.log('websocket4Room connection opened - fromRoomToStart');
+        console.log('websocket4Room connection opened - room');
     };
 
     websocket.onclose = function (event) {
@@ -110,11 +110,11 @@
     }
 
     websocket4Room.onclose = function() {
-        console.log('websocket4Room connection closed - fromRoomToStart');
+        console.log('websocket4Room connection closed - room');
         websocket4Room = null;
     };
     websocket4Room.onerror = function(error) {
-        console.error('websocket4Room error - fromRoomToStart:', error);
+        console.error('websocket4Room error - room:', error);
     };
 
     websocket.onmessage = function (event) {
@@ -247,7 +247,7 @@
     }
 
     function redSideJoin(redUser){
-        redNickName = redUser.nickName; // 这一步付值
+        redNickName = redUser.nickName; // 付值
         redWinRate = redUser.winRate;
         document.getElementById("waitAnotherPlayer").style.visibility = "hidden";
         document.getElementById("redNickName").textContent = `敌方: ${redUser.nickName}`;

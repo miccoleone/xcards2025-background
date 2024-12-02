@@ -12,9 +12,9 @@
 	<artifactId>demo01</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>demo01</name>
-	<description>Demo project for Spring Boot</description>
+	<description>xcards</description>
 	<properties>
-		<java.version>1.8</java.version>
+		<java.version>17</java.version>
 	</properties>
 	<dependencies>
 		<dependency>

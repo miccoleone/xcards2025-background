@@ -54,7 +54,7 @@ public class GameUtil {
                 session.getBasicRemote().sendText(jsonMessage);
             }
         } catch (Exception e) {
-            log.error("WebSocket4FromRoomToStart sendMessage error!:", e);
+            log.error("/GameUtil sendMessage error!:", e);
         }
     }
 }
