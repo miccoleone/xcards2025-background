@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=2.0, user-scalable=yes" />
+    <title>十張牌</title>
+    <script src="http://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <link href="https://cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/mystyle.css">
+    <script src="http://libs.baidu.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuid.min.js"></script>
+    <script src="./util/utils.js"></script>
+
+</head>
+
+<body>
+
+<div class="container-fluid">
+    <div class="row clearfix" style="text-align: center">
+        <div id="redSide" aria-hidden="true" style="visibility: hidden;">
+            <div class="col-md-24 column">
+                <br>
+                <div class="player-name" style="color: red" id="redNickName">solwyer</div><div id="redWinRate"> </div>
+                <br>
+                <div class="card-side">
+                    <button id="btn1" type="button" class="btn btn-default" onclick="sendCard(1)">1</button>
+                    <button id="btn2" type="button" class="btn btn-default" onclick="sendCard(2)">2</button>
+                    <button id="btn3" type="button" class="btn btn-default" onclick="sendCard(3)">3</button>
+                    <button id="btn4" type="button" class="btn btn-default" onclick="sendCard(4)">4</button>
+                    <button id="btn5" type="button" class="btn btn-default" onclick="sendCard(5)">5</button>
+                </div>
+            </div>
+            <br>
+            <div class="col-md-24 column">
+                <div class="card-side">
+                    <button id="btn6" type="button"  class="btn btn-default" onclick="sendCard(6)">6</button>
+                    <button id="btn7" type="button" class="btn btn-default" onclick="sendCard(7)">7</button>
+                    <button id="btn8" type="button" class="btn btn-default" onclick="sendCard(8)">8</button>
+                    <button id="btn9" type="button" class="btn btn-default" onclick="sendCard(9)">9</button>
+                    <button id="btn10" type="button" class="btn btn-default" onclick="sendCard(10)">10</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="centerSide">
+            <br>
+            <br>
+            <div id="waitAnotherPlayer" aria-hidden="true" style="visibility: hidden;">
+                <button onclick="location.reload()" type="button" class="btn btn-primary">等待对手进入...</button>
+            </div>
+            <div id="answer" aria-hidden="true" style="visibility: hidden;">
+                <button onclick="location.reload()" type="button" class="btn btn-primary">再來一局</button>
+            </div>
+            <div id="point" aria-hidden="true" style="visibility: hidden;">
+                <label>請出牌</label>
+            </div>
+            <br>
+            <br>
+        </div>
+
+        <div id="blueSide" aria-hidden="true" style="visibility: hidden;">
+            <div class="col-md-24 column">
+                <div class="card-side">
+                    <button id="btn11" type="button" class="btn btn-default" onclick="sendCard(11)">1</button>
+                    <button id="btn12" type="button" class="btn btn-default" onclick="sendCard(12)">2</button>
+                    <button id="btn13" type="button" class="btn btn-default" onclick="sendCard(13)">3</button>
+                    <button id="btn14" type="button" class="btn btn-default" onclick="sendCard(14)">4</button>
+                    <button id="btn15" type="button" class="btn btn-default" onclick="sendCard(15)">5</button>
+                </div>
+            </div>
+            <br>
+            <div class="col-md-24 column">
+                <div class="card-side">
+                    <button id="btn16" type="button" class="btn btn-default" onclick="sendCard(16)">6</button>
+                    <button id="btn17" type="button" class="btn btn-default" onclick="sendCard(17)">7</button>
+                    <button id="btn18" type="button" class="btn btn-default" onclick="sendCard(18)">8</button>
+                    <button id="btn19" type="button" class="btn btn-default" onclick="sendCard(19)">9</button>
+                    <button id="btn20" type="button" class="btn btn-default" onclick="sendCard(20)">10</button>
+                </div>
+            </div>
+            <br>
+            <div class="player-name" style="color: blue" id="blueNickName">土豆1</div><div id="blueWinRate"> </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // 使用 let 和 const 代替 var，避免全局变量污染
+    let websocket = null;
+    let websocket4Room = null;
+    let deviceId = localStorage.getItem("deviceId") || generateDeviceId(); // 获取生成的设备Id
+
+    // 创建游戏 WebSocket连接
+    websocket = new WebSocket(`ws://localhost:4396/game?deviceId=${deviceId}`);
+    websocket.onopen = function (event) {
+        console.log('websocket connection opened - websocket ');
+    }
+    // 创建房间控制 WebSocket连接
+    websocket4Room = new WebSocket(`ws://localhost:4396/fromRoomToStart?deviceId=${deviceId}`);
+    websocket4Room.onopen = function() {
+        console.log('websocket4Room connection opened - fromRoomToStart');
+    };
+
+    websocket.onclose = function (event) {
+        console.log('连接关闭');
+        websocket = null;
+    }
+    websocket.onerror = function () {
+        alert('websocket通信发生错误！');
+    }
+
+    websocket4Room.onclose = function() {
+        console.log('websocket4Room connection closed - fromRoomToStart');
+        websocket4Room = null;
+    };
+    websocket4Room.onerror = function(error) {
+        console.error('websocket4Room error - fromRoomToStart:', error);
+    };
+
+    websocket.onmessage = function (event) {
+        let m = event.data;
+
+        switch (m) {
+            case '100':
+                alert(`${redNickName}胜！`);
+                document.getElementById("answer").style.visibility = "visible"; // 显示
+                break;
+
+            case '200':
+                alert(`${blueNickName}胜！`);
+                document.getElementById("answer").style.visibility = "visible"; // 显示
+                break;
+
+            case '300':
+                document.getElementById("point").style.visibility = "visible"; // 显示
+                break;
+
+<!--            case '400':-->
+<!--                document.getElementById("point").style.visibility = "hidden"; // 隐藏-->
+<!--                break;-->
+
+            default:
+                // 默认处理，其他值
+                document.getElementById('btn' + m).style.backgroundColor = "grey";
+                document.getElementById('btn' + m).disabled = true;
+                break;
+        }
+    };
+
+    // 房主的页面接收 人员到齐！
+    websocket4Room.onmessage = function (event) {
+        // 解析接收到的消息
+        let data = JSON.parse(event.data);
+        console.log('来自房间控制的消息:', data);
+        let redUser = data[1];   // 红色方玩家数据
+        let m = redUser.msgCode;  // 60
+
+        switch (m) {
+           case '60':
+                    redSideJoin(redUser); // 红方加入游戏，显示对手信息
+                    break;
+
+            default:
+                break;
+        }
+    };
+
+    // 出牌
+    function sendCard(cardId) {
+        document.getElementById('btn'+cardId).disabled=true;
+
+        let nickName = "";  // 玩家名称
+        let role = "";      // 角色（红方/蓝方）
+
+        // 获取当前点击的按钮
+        let clickedButton = document.getElementById('btn' + cardId);
+
+        // 获取当前按钮的父元素（即redSide所在的区域）
+        let parentElement = clickedButton.parentElement.parentElement.parentElement;
+
+        // 判断父元素的 id 是 redSide 还是 blueSide 来确定角色
+        if (parentElement.id === "redSide") {
+                nickName = document.getElementById("redNickName").innerText;
+                role = "redSide";// 红方
+            } else if (parentElement.id === "blueSide") {
+                nickName = document.getElementById("blueNickName").innerText;
+                role = "blueSide"; // 蓝方
+            }
+            // 创建 playerData 对象
+            let playerData = {
+                nickName: nickName,
+                role: role,
+                deviceId: deviceId,
+                card: cardId
+            };
+
+            // 发送 playerData 对象
+            websocket.send(JSON.stringify(playerData));
+
+            // 禁用按钮，表示该牌已出
+            clickedButton.disabled = true;
+            document.getElementById("point").style.visibility = "hidden"; // 隐藏
+
+    }
+
+    // 获取 URL 中的查询参数
+    function getQueryParam(param) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(param);
+    }
+
+    // 页面加载完成时获取参数并显示信息
+    var blueNickName = "";
+    var blueWinRate = "";
+    var redNickName = "";
+    var redWinRate = "";
+    window.onload = function() {
+        let msgCode = getQueryParam("msgCode");
+        blueNickName = getQueryParam("blueNickName");
+        blueWinRate = getQueryParam("blueWinRate");
+        redNickName = getQueryParam("redNickName");
+        redWinRate = getQueryParam("redWinRate");
+
+        // 显示玩家信息
+        if (msgCode === "50") { // 蓝色方 只显示蓝色方的牌
+            document.getElementById("blueNickName").textContent = `我: ${blueNickName}`;
+            document.getElementById("blueWinRate").textContent = `胜率: ${blueWinRate}%`;
+            changeColor(msgCode);
+        }
+        if(msgCode === "60"){ // 红色方 显示所有的牌
+            document.getElementById("redNickName").textContent = `我: ${redNickName}`;
+            document.getElementById("redWinRate").textContent = `胜率: ${redWinRate}%`;
+            document.getElementById("blueNickName").textContent = `敌方: ${blueNickName}`;
+            document.getElementById("blueWinRate").textContent = `胜率: ${blueWinRate}%`;
+            changeColor(msgCode);
+        }
+    };
+
+    function changeColor(msgCode){
+        if (msgCode === "50") {  // 蓝色方
+            document.getElementById("blueSide").style.visibility = "visible"; // 显示蓝色方的牌
+            document.getElementById("waitAnotherPlayer").style.visibility = "visible"; // 等待对手进入...
+        } else { // 红色方
+            document.getElementById("redSide").style.visibility = "visible"; // 显示红色方的牌
+            document.getElementById("blueSide").style.visibility = "visible"; // 显示蓝色方的牌
+        }
+    }
+
+    function redSideJoin(redUser){
+        redNickName = redUser.nickName; // 这一步付值
+        redWinRate = redUser.winRate;
+        document.getElementById("waitAnotherPlayer").style.visibility = "hidden";
+        document.getElementById("redNickName").textContent = `敌方: ${redUser.nickName}`;
+        document.getElementById("redWinRate").textContent = `胜率: ${redUser.winRate}%`;
+        document.getElementById("redSide").style.visibility = "visible";
+        document.getElementById("redSide").style.color = "red";
+    }
+
+    window.onbeforeunload = function () {
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+            websocket.close();
+        }
+        if (websocket4Room && websocket4Room.readyState === WebSocket.OPEN) {
+            websocket4Room.close();
+        }
+    };
+
+</script>
+
+</body>
+</html>
