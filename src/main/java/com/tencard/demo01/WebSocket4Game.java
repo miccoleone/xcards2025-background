@@ -105,7 +105,7 @@ public class WebSocket4Game {
 
             // 向房间内的所有玩家发送消息
             roomId2UserListMap.get(roomId).forEach(e -> {
-                log.info("/game ---------- 出牌消息 user：{}, card: {}, userRole:{}, sessionId:{}", e.nickName, e.card, e.session.getId());
+                log.info("/game ---------- 出牌消息 user：{}, card: {}, userRole:{}, sessionId:{}", e.nickName, e.card,e.role, e.session.getId());
                 sendMessage(deviceId2SessionMap_Game.get(e.getDeviceId()), card.toString());
                 sendMessage(deviceId2SessionMap_Game.get(e.getDeviceId()), finalOtherCard.toString());
             });

@@ -16,27 +16,27 @@
 
 <div class="container-fluid">
     <div class="row clearfix" style="text-align: center">
-        <div id="redSide" aria-hidden="true" style="visibility: hidden;">
+        <div id="opponentSide" aria-hidden="true" style="visibility: hidden;">
             <div class="col-md-24 column">
                 <br>
-                <div class="player-name" style="color: red" id="redNickName">solwyer</div><div id="redWinRate"> </div>
+                <div class="player-name" style="color: red" id="opponentName"></div><div id="opponentWinRate"></div>
                 <br>
                 <div class="card-side">
-                    <button id="btn1" type="button" class="btn btn-default" onclick="sendCard(1)">1</button>
-                    <button id="btn2" type="button" class="btn btn-default" onclick="sendCard(2)">2</button>
-                    <button id="btn3" type="button" class="btn btn-default" onclick="sendCard(3)">3</button>
-                    <button id="btn4" type="button" class="btn btn-default" onclick="sendCard(4)">4</button>
-                    <button id="btn5" type="button" class="btn btn-default" onclick="sendCard(5)">5</button>
+                    <button id="opp1" type="button" class="btn btn-default" disabled>1</button>
+                    <button id="opp2" type="button" class="btn btn-default" disabled>2</button>
+                    <button id="opp3" type="button" class="btn btn-default" disabled>3</button>
+                    <button id="opp4" type="button" class="btn btn-default" disabled>4</button>
+                    <button id="opp5" type="button" class="btn btn-default" disabled>5</button>
                 </div>
             </div>
             <br>
             <div class="col-md-24 column">
                 <div class="card-side">
-                    <button id="btn6" type="button"  class="btn btn-default" onclick="sendCard(6)">6</button>
-                    <button id="btn7" type="button" class="btn btn-default" onclick="sendCard(7)">7</button>
-                    <button id="btn8" type="button" class="btn btn-default" onclick="sendCard(8)">8</button>
-                    <button id="btn9" type="button" class="btn btn-default" onclick="sendCard(9)">9</button>
-                    <button id="btn10" type="button" class="btn btn-default" onclick="sendCard(10)">10</button>
+                    <button id="opp6" type="button" class="btn btn-default" disabled>6</button>
+                    <button id="opp7" type="button" class="btn btn-default" disabled>7</button>
+                    <button id="opp8" type="button" class="btn btn-default" disabled>8</button>
+                    <button id="opp9" type="button" class="btn btn-default" disabled>9</button>
+                    <button id="opp10" type="button" class="btn btn-default" disabled>10</button>
                 </div>
             </div>
         </div>
@@ -57,28 +57,28 @@
             <br>
         </div>
 
-        <div id="blueSide" aria-hidden="true" style="visibility: hidden;">
+        <div id="mySide" aria-hidden="true" style="visibility: hidden;">
             <div class="col-md-24 column">
                 <div class="card-side">
-                    <button id="btn11" type="button" class="btn btn-default" onclick="sendCard(11)">1</button>
-                    <button id="btn12" type="button" class="btn btn-default" onclick="sendCard(12)">2</button>
-                    <button id="btn13" type="button" class="btn btn-default" onclick="sendCard(13)">3</button>
-                    <button id="btn14" type="button" class="btn btn-default" onclick="sendCard(14)">4</button>
-                    <button id="btn15" type="button" class="btn btn-default" onclick="sendCard(15)">5</button>
+                    <button id="my1" type="button" class="btn btn-default" onclick="sendCard(1)">1</button>
+                    <button id="my2" type="button" class="btn btn-default" onclick="sendCard(2)">2</button>
+                    <button id="my3" type="button" class="btn btn-default" onclick="sendCard(3)">3</button>
+                    <button id="my4" type="button" class="btn btn-default" onclick="sendCard(4)">4</button>
+                    <button id="my5" type="button" class="btn btn-default" onclick="sendCard(5)">5</button>
                 </div>
             </div>
             <br>
             <div class="col-md-24 column">
                 <div class="card-side">
-                    <button id="btn16" type="button" class="btn btn-default" onclick="sendCard(16)">6</button>
-                    <button id="btn17" type="button" class="btn btn-default" onclick="sendCard(17)">7</button>
-                    <button id="btn18" type="button" class="btn btn-default" onclick="sendCard(18)">8</button>
-                    <button id="btn19" type="button" class="btn btn-default" onclick="sendCard(19)">9</button>
-                    <button id="btn20" type="button" class="btn btn-default" onclick="sendCard(20)">10</button>
+                    <button id="my6" type="button" class="btn btn-default" onclick="sendCard(6)">6</button>
+                    <button id="my7" type="button" class="btn btn-default" onclick="sendCard(7)">7</button>
+                    <button id="my8" type="button" class="btn btn-default" onclick="sendCard(8)">8</button>
+                    <button id="my9" type="button" class="btn btn-default" onclick="sendCard(9)">9</button>
+                    <button id="my10" type="button" class="btn btn-default" onclick="sendCard(10)">10</button>
                 </div>
             </div>
             <br>
-            <div class="player-name" style="color: blue" id="blueNickName">土豆1</div><div id="blueWinRate"> </div>
+            <div class="player-name" id="myName">我</div><div id="myWinRate"></div>
         </div>
 
     </div>
@@ -119,26 +119,37 @@
 
     websocket.onmessage = function (event) {
         let m = event.data;
+        let msgCode = getQueryParam("msgCode");
+        let isRedSide = msgCode === "60";
 
         switch (m) {
             case '100':
-                alert(`${redNickName}胜！`);
-                document.getElementById("answer").style.visibility = "visible"; // 显示
+                alert(isRedSide ? "你赢了！" : "对手赢了！");
+                document.getElementById("answer").style.visibility = "visible";
                 break;
 
             case '200':
-                alert(`${blueNickName}胜！`);
-                document.getElementById("answer").style.visibility = "visible"; // 显示
+                alert(isRedSide ? "对手赢了！" : "你赢了！");
+                document.getElementById("answer").style.visibility = "visible";
                 break;
 
             case '300':
-                document.getElementById("point").style.visibility = "visible"; // 显示
+                document.getElementById("point").style.visibility = "visible";
                 break;
 
             default:
-                // 默认处理，其他值
-                document.getElementById('btn' + m).style.backgroundColor = "grey";
-                document.getElementById('btn' + m).disabled = true;
+                // 处理卡牌变灰
+                let cardNum = parseInt(m);
+                let buttonId;
+                if ((cardNum <= 10 && isRedSide) || (cardNum > 10 && !isRedSide)) {
+                    // 自己出的牌
+                    buttonId = 'my' + (cardNum <= 10 ? cardNum : cardNum - 10);
+                } else {
+                    // 对手出的牌
+                    buttonId = 'opp' + (cardNum <= 10 ? cardNum : cardNum - 10);
+                }
+                document.getElementById(buttonId).style.backgroundColor = "grey";
+                document.getElementById(buttonId).disabled = true;
                 break;
         }
     };
@@ -163,40 +174,20 @@
 
     // 出牌
     function sendCard(cardId) {
-        document.getElementById('btn'+cardId).disabled=true;
+        let msgCode = getQueryParam("msgCode");
+        let actualCardId = msgCode === "60" ? cardId : (cardId + 10); // 根据角色调整实际的卡牌ID
+        
+        document.getElementById('my' + cardId).disabled = true;
 
-        let nickName = "";  // 玩家名称
-        let role = "";      // 角色（红方/蓝方）
+        let playerData = {
+            nickName: getQueryParam(msgCode === "60" ? "redNickName" : "blueNickName"),
+            role: msgCode === "60" ? "redSide" : "blueSide",
+            deviceId: deviceId,
+            card: actualCardId
+        };
 
-        // 获取当前点击的按钮
-        let clickedButton = document.getElementById('btn' + cardId);
-
-        // 获取当前按钮的父元素（即redSide所在的区域）
-        let parentElement = clickedButton.parentElement.parentElement.parentElement;
-
-        // 判断父元素的 id 是 redSide 还是 blueSide 来确定角色
-        if (parentElement.id === "redSide") {
-                nickName = document.getElementById("redNickName").innerText;
-                role = "redSide";// 红方
-            } else if (parentElement.id === "blueSide") {
-                nickName = document.getElementById("blueNickName").innerText;
-                role = "blueSide"; // 蓝方
-            }
-            // 创建 playerData 对象
-            let playerData = {
-                nickName: nickName,
-                role: role,
-                deviceId: deviceId,
-                card: cardId
-            };
-
-            // 发送 playerData 对象
-            websocket.send(JSON.stringify(playerData));
-
-            // 禁用按钮，表示该牌已出
-            clickedButton.disabled = true;
-            document.getElementById("point").style.visibility = "hidden"; // 隐藏
-
+        websocket.send(JSON.stringify(playerData));
+        document.getElementById("point").style.visibility = "hidden";
     }
 
     // 获取 URL 中的查询参数
@@ -206,50 +197,48 @@
     }
 
     // 页面加载完成时获取参数并显示信息
-    var blueNickName = "";
-    var blueWinRate = "";
-    var redNickName = "";
-    var redWinRate = "";
     window.onload = function() {
         let msgCode = getQueryParam("msgCode");
-        blueNickName = getQueryParam("blueNickName");
-        blueWinRate = getQueryParam("blueWinRate");
-        redNickName = getQueryParam("redNickName");
-        redWinRate = getQueryParam("redWinRate");
+        let isRedSide = msgCode === "60";
+        let myNickName, myWinRate, opponentNickName, opponentWinRate;
+
+        if (isRedSide) {
+            // 如果是红方
+            myNickName = getQueryParam("redNickName");
+            myWinRate = getQueryParam("redWinRate");
+            opponentNickName = getQueryParam("blueNickName");
+            opponentWinRate = getQueryParam("blueWinRate");
+        } else {
+            // 如果是蓝方
+            myNickName = getQueryParam("blueNickName");
+            myWinRate = getQueryParam("blueWinRate");
+            document.getElementById("waitAnotherPlayer").style.visibility = "visible";
+        }
 
         // 显示玩家信息
-        if (msgCode === "50") { // 蓝色方 只显示蓝色方的牌
-            document.getElementById("blueNickName").textContent = `我: ${blueNickName}`;
-            document.getElementById("blueWinRate").textContent = `胜率: ${blueWinRate}%`;
-            changeColor(msgCode);
+        document.getElementById("myName").textContent = `我: ${myNickName}`;
+        document.getElementById("myWinRate").textContent = `胜率: ${myWinRate}%`;
+        
+        if (opponentNickName) {
+            document.getElementById("opponentName").textContent = `对手: ${opponentNickName}`;
+            document.getElementById("opponentWinRate").textContent = `胜率: ${opponentWinRate}%`;
         }
-        if(msgCode === "60"){ // 红色方 显示所有的牌
-            document.getElementById("redNickName").textContent = `我: ${redNickName}`;
-            document.getElementById("redWinRate").textContent = `胜率: ${redWinRate}%`;
-            document.getElementById("blueNickName").textContent = `敌方: ${blueNickName}`;
-            document.getElementById("blueWinRate").textContent = `胜率: ${blueWinRate}%`;
-            changeColor(msgCode);
+
+        // 显示牌面
+        document.getElementById("mySide").style.visibility = "visible";
+        if (opponentNickName) {
+            document.getElementById("opponentSide").style.visibility = "visible";
         }
     };
 
-    function changeColor(msgCode){
-        if (msgCode === "50") {  // 蓝色方
-            document.getElementById("blueSide").style.visibility = "visible"; // 显示蓝色方的牌
-            document.getElementById("waitAnotherPlayer").style.visibility = "visible"; // 等待对手进入...
-        } else { // 红色方
-            document.getElementById("redSide").style.visibility = "visible"; // 显示红色方的牌
-            document.getElementById("blueSide").style.visibility = "visible"; // 显示蓝色方的牌
+    function redSideJoin(redUser) {
+        let msgCode = getQueryParam("msgCode");
+        if (msgCode === "50") { // 蓝方玩家
+            document.getElementById("waitAnotherPlayer").style.visibility = "hidden";
+            document.getElementById("opponentName").textContent = `对手: ${redUser.nickName}`;
+            document.getElementById("opponentWinRate").textContent = `胜率: ${redUser.winRate}%`;
+            document.getElementById("opponentSide").style.visibility = "visible";
         }
-    }
-
-    function redSideJoin(redUser){
-        redNickName = redUser.nickName; // 付值
-        redWinRate = redUser.winRate;
-        document.getElementById("waitAnotherPlayer").style.visibility = "hidden";
-        document.getElementById("redNickName").textContent = `敌方: ${redUser.nickName}`;
-        document.getElementById("redWinRate").textContent = `胜率: ${redUser.winRate}%`;
-        document.getElementById("redSide").style.visibility = "visible";
-        document.getElementById("redSide").style.color = "red";
     }
 
     window.onbeforeunload = function () {
