@@ -57,37 +57,26 @@
             display: block;
         }
 
-        /* 添加卡牌翻转动画样式 */
+        /* 卡牌基础样式 */
         .card-side button {
-            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            transition: all 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
             position: relative;
             transform-origin: center center;
             background: white;
             border: 1px solid #ccc;
         }
 
+        /* 卡牌点击动画 */
         .card-side button.flip {
-            animation: cardPlay 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: cardPlay 0.8s cubic-bezier(0.23, 1, 0.32, 1);
             background-color: grey !important;
         }
 
-        /* 定义动画关键帧 */
+        /* 修改动画关键帧 */
         @keyframes cardPlay {
             0% {
-                transform: scale(1);
-                box-shadow: 0 0 0 rgba(0,0,0,0);
-            }
-            20% {
-                transform: scale(0.95) translateY(2px);
-                box-shadow: 0 0 0 rgba(0,0,0,0);
-            }
-            40% {
-                transform: scale(1.2) translateY(-15px);
-                box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-            }
-            70% {
-                transform: scale(1.1) translateY(-5px);
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                transform: scale(1.2) translateY(-20px);
+                box-shadow: 0 15px 15px rgba(0,0,0,0.2);
             }
             100% {
                 transform: scale(1) translateY(0);
@@ -111,6 +100,54 @@
         /* 确保翻转时文字不会镜像 */
         .card-side button span {
             backface-visibility: hidden;
+        }
+
+        /* 整体容器样式 */
+        .container-fluid {
+            padding-top: 8vh;  /* 顶部留出10%的视窗高度 */
+            max-width: 600px;   /* 限制最大宽度 */
+            margin: 0 auto;     /* 水平居中 */
+        }
+
+        /* 调整卡牌间距和大小 */
+        .card-side {
+            display: flex;
+            justify-content: center;
+            gap: 15px;         /* 卡牌之间的间距 */
+            margin: 8px 0;    /* 上下行之间的间距 */
+        }
+
+        /* 卡牌按钮样式 */
+        .card-side button {
+            min-width: 45px;   /* 最小宽度 */
+            min-height: 45px;  /* 最小高度 */
+            font-size: 18px;   /* 字体大小 */
+            padding: 10px;     /* 内边距 */
+            border-radius: 8px; /* 圆角 */
+        }
+
+        /* 玩家信息样式 */
+        .player-name {
+            font-size: 15px;
+            margin: 10px 0;    /* 增加与卡牌的间距 */
+        }
+
+        /* 响应式调整 */
+        @media screen and (max-width: 480px) {
+            .container-fluid {
+                padding-top: 8vh;
+            }
+
+            .card-side {
+                gap: 12px;
+            }
+
+            .card-side button {
+                min-width: 40px;
+                min-height: 40px;
+                font-size: 16px;
+                padding: 8px;
+            }
         }
     </style>
 </head>
@@ -249,12 +286,23 @@
 
         switch (m) {
             case '100':
+                // 延迟显示胜利结果
+                setTimeout(() => {
+                    showResult(isRedSide ? "胜利！" : "失败！", isRedSide);
+                    document.getElementById("answer").style.visibility = "visible";
+                    disableAllMyCards();
+                    document.getElementById("point").style.visibility = "hidden";
+                }, 1500);
+                break;
+
             case '200':
-                // 胜负已分
-                showResult(m === '100' ? (isRedSide ? "胜利！" : "失败！") : (isRedSide ? "失败！" : "胜利！"), m === '100' === isRedSide);
-                document.getElementById("answer").style.visibility = "visible";
-                disableAllMyCards();
-                document.getElementById("point").style.visibility = "hidden";
+                // 延迟显示失败结果
+                setTimeout(() => {
+                    showResult(isRedSide ? "失败！" : "胜利！", !isRedSide);
+                    document.getElementById("answer").style.visibility = "visible";
+                    disableAllMyCards();
+                    document.getElementById("point").style.visibility = "hidden";
+                }, 1500);
                 break;
 
             case '300':
