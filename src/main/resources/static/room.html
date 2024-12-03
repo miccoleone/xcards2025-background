@@ -81,7 +81,6 @@
 </div>
 
 <script>
-<!--    websocket = new WebSocket('ws://localhost:4396/room');-->
 
     let deviceId = localStorage.getItem("deviceId") || generateDeviceId(); // 获取生成的设备Id
     let websocket = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
@@ -151,7 +150,6 @@
         document.getElementById("joinBtn").disabled = false;
     };
 
-<!--    var deviceId = localStorage.getItem("deviceId") || generateDeviceId(); // 获取生成的设备Id-->
     document.getElementById("joinBtn").addEventListener("click", function() {
         joinRoom();
     });
