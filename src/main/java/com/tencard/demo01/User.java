@@ -37,6 +37,8 @@ public class User {
     public Integer winRate; // 胜率 49
     
     public String msgCode; // 消息编号 50 60 100 200
+    
+    public String type;  // 添加消息类型字段
 
 }
 

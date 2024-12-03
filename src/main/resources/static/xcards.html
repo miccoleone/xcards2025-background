@@ -9,7 +9,110 @@
     <script src="http://libs.baidu.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuid.min.js"></script>
     <script src="./util/utils.js"></script>
+    <style>
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            display: none;  /* 改用 display 来控制显示/隐藏 */
+        }
 
+        .result-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            width: 80%;
+            max-width: 280px;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .result-box h2 {
+            font-size: 24px;
+            margin: 0 0 20px 0;
+            font-weight: bold;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .button-group button {
+            min-width: 90px;
+            padding: 8px 15px;
+        }
+
+        /* 修改显示逻辑 */
+        .overlay.show {
+            display: block;
+        }
+
+        /* 添加卡牌翻转动画样式 */
+        .card-side button {
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            position: relative;
+            transform-origin: center center;
+            background: white;
+            border: 1px solid #ccc;
+        }
+
+        .card-side button.flip {
+            animation: cardPlay 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            background-color: grey !important;
+        }
+
+        /* 定义动画关键帧 */
+        @keyframes cardPlay {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 rgba(0,0,0,0);
+            }
+            20% {
+                transform: scale(0.95) translateY(2px);
+                box-shadow: 0 0 0 rgba(0,0,0,0);
+            }
+            40% {
+                transform: scale(1.2) translateY(-15px);
+                box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            }
+            70% {
+                transform: scale(1.1) translateY(-5px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            100% {
+                transform: scale(1) translateY(0);
+                box-shadow: 0 0 0 rgba(0,0,0,0);
+            }
+        }
+
+        /* 添加按钮悬停效果 */
+        .card-side button:not(.flip):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+
+        /* 添加按钮按下效果 */
+        .card-side button:not(.flip):active {
+            transform: translateY(1px);
+            box-shadow: 0 0 2px rgba(0,0,0,0.1);
+        }
+
+        /* 确保翻转时文字不会镜像 */
+        .card-side button span {
+            backface-visibility: hidden;
+        }
+    </style>
 </head>
 
 <body>
@@ -48,7 +151,13 @@
                 <button onclick="location.reload()" type="button" class="btn btn-primary">等待对手进入...</button>
             </div>
             <div id="answer" aria-hidden="true" style="visibility: hidden;">
-                <button onclick="location.reload()" type="button" class="btn btn-primary">再來一局</button>
+                <button onclick="goHome()" type="button" class="btn btn-primary" style="margin-right: 10px;">主页</button>
+                <button onclick="requestRematch()" type="button" class="btn btn-success">继续游戏</button>
+            </div>
+            <div id="rematchRequest" aria-hidden="true" style="visibility: hidden;">
+                <p style="margin-bottom: 10px;">对手请求继续游戏</p>
+                <button onclick="acceptRematch()" type="button" class="btn btn-success" style="margin-right: 10px;">接受</button>
+                <button onclick="rejectRematch()" type="button" class="btn btn-danger">拒绝</button>
             </div>
             <div id="point" aria-hidden="true" style="visibility: hidden;">
                 <label>請出牌</label>
@@ -84,11 +193,27 @@
     </div>
 </div>
 
+<div class="overlay" id="resultOverlay">
+    <div class="result-box" id="resultBox">
+        <h2 id="resultText"></h2>
+        <div class="button-group">
+            <button onclick="goHome()" type="button" class="btn btn-primary">主页</button>
+            <button onclick="requestRematch()" type="button" class="btn btn-success">继续游戏</button>
+        </div>
+    </div>
+</div>
+
+<audio id="moveSound" preload="auto">
+    <source src="footstep.mp3" type="audio/mpeg">
+</audio>
+
 <script>
     // 使用 let 和 const 代替 var，避免全局变量污染
     let websocket = null;
     let websocket4Room = null;
     let deviceId = localStorage.getItem("deviceId") || generateDeviceId(); // 获取生成的设备Id
+    let hasPlayedThisRound = false;
+    let receivedCardsCount = 0;  // 新增：用于跟踪本轮收到的牌数
 
     // 创建游戏 WebSocket连接
     websocket = new WebSocket(`ws://localhost:4396/game?deviceId=${deviceId}`);
@@ -106,7 +231,7 @@
         websocket = null;
     }
     websocket.onerror = function () {
-        alert('websocket通信发生错误！');
+        console.log('/xcards websocket通信发生错误！');
     }
 
     websocket4Room.onclose = function() {
@@ -124,60 +249,107 @@
 
         switch (m) {
             case '100':
-                alert(isRedSide ? "你赢了！" : "对手赢了！");
-                document.getElementById("answer").style.visibility = "visible";
-                break;
-
             case '200':
-                alert(isRedSide ? "对手赢了！" : "你赢了！");
+                // 胜负已分
+                showResult(m === '100' ? (isRedSide ? "胜利！" : "失败！") : (isRedSide ? "失败！" : "胜利！"), m === '100' === isRedSide);
                 document.getElementById("answer").style.visibility = "visible";
+                disableAllMyCards();
+                document.getElementById("point").style.visibility = "hidden";
                 break;
 
             case '300':
+                // 仅显示提示，不做其他处理
                 document.getElementById("point").style.visibility = "visible";
+                playMoveSound();
                 break;
 
             default:
-                // 处理卡牌变灰
-                let cardNum = parseInt(m);
-                let buttonId;
-                if ((cardNum <= 10 && isRedSide) || (cardNum > 10 && !isRedSide)) {
-                    // 自己出的牌
-                    buttonId = 'my' + (cardNum <= 10 ? cardNum : cardNum - 10);
-                } else {
-                    // 对手出的牌
-                    buttonId = 'opp' + (cardNum <= 10 ? cardNum : cardNum - 10);
+                try {
+                    let cardNum = parseInt(m);
+                    if (isNaN(cardNum)) return;
+
+                    // 处理翻牌动画
+                    let buttonId;
+                    if ((cardNum <= 10 && isRedSide) || (cardNum > 10 && !isRedSide)) {
+                        // 自己的牌
+                        buttonId = 'my' + (cardNum <= 10 ? cardNum : cardNum - 10);
+                    } else {
+                        // 对手的牌
+                        buttonId = 'opp' + (cardNum <= 10 ? cardNum : cardNum - 10);
+                    }
+
+                    const button = document.getElementById(buttonId);
+                    if (button) {
+                        button.classList.add('flip');
+                        button.disabled = true;
+                    }
+
+                    // 计数收到的牌
+                    receivedCardsCount++;
+                    
+                    // 当收到两张牌时，说明本轮结束
+                    if (receivedCardsCount === 2) {
+                        receivedCardsCount = 0;  // 重置计数
+                        hasPlayedThisRound = false;  // 重置出牌状态
+                        enableRemainingCards();  // 启用剩余的牌
+                    }
+                } catch (error) {
+                    console.error('Error handling card message:', error);
                 }
-                document.getElementById(buttonId).style.backgroundColor = "grey";
-                document.getElementById(buttonId).disabled = true;
                 break;
         }
     };
 
     // 房主的页面接收 人员到齐！
     websocket4Room.onmessage = function (event) {
-        // 解析接收到的消息
         let data = JSON.parse(event.data);
         console.log('来自房间控制的消息:', data);
-        let redUser = data[1];   // 红色方玩家数据
-        let m = redUser.msgCode;  // 60
 
-        switch (m) {
-           case '60':
-                    redSideJoin(redUser); // 红方加入游戏，显示对手信息
-                    break;
+        // 处理数组类型的消息（原有的红方加入逻辑）
+        if (Array.isArray(data)) {
+            let redUser = data[1];
+            if (redUser && redUser.msgCode === '60') {
+                redSideJoin(redUser);
+            }
+            return;
+        }
 
-            default:
+        // 处理继续游戏相关的消息
+        switch (data.type) {
+            case 'rematch_request':
+                // 显示继续游戏请求
+                document.getElementById("rematchRequest").style.visibility = "visible";
+                break;
+
+            case 'rematch_accept':
+                // 对方接受继续游戏
+                alert("对手同意继续游戏！");
+                resetGameState();
+                break;
+
+            case 'rematch_reject':
+                // 对方拒绝继续游戏
+                alert("对手拒绝继续游戏！");
+                document.querySelector('#answer button.btn-success').disabled = false;
                 break;
         }
     };
 
-    // 出牌
+    // 修改发牌函数，添加翻转动画
     function sendCard(cardId) {
+        if (hasPlayedThisRound) {
+            alert("本轮已经出过牌了，请等待新的回合！");
+            return;
+        }
+
         let msgCode = getQueryParam("msgCode");
-        let actualCardId = msgCode === "60" ? cardId : (cardId + 10); // 根据角色调整实际的卡牌ID
+        let actualCardId = msgCode === "60" ? cardId : (cardId + 10);
         
-        document.getElementById('my' + cardId).disabled = true;
+        const button = document.getElementById('my' + cardId);
+        if (button) {
+            button.classList.add('flip');
+            button.disabled = true;
+        }
 
         let playerData = {
             nickName: getQueryParam(msgCode === "60" ? "redNickName" : "blueNickName"),
@@ -188,6 +360,9 @@
 
         websocket.send(JSON.stringify(playerData));
         document.getElementById("point").style.visibility = "hidden";
+        
+        hasPlayedThisRound = true;
+        disableAllMyCards();
     }
 
     // 获取 URL 中的查询参数
@@ -229,6 +404,9 @@
         if (opponentNickName) {
             document.getElementById("opponentSide").style.visibility = "visible";
         }
+        
+        // 初始时启用所有牌（因为是新的一轮）
+        enableRemainingCards();
     };
 
     function redSideJoin(redUser) {
@@ -249,6 +427,124 @@
             websocket4Room.close();
         }
     };
+
+    // 修改 disableAllMyCards 函数
+    function disableAllMyCards() {
+        for (let i = 1; i <= 10; i++) {
+            let btn = document.getElementById('my' + i);
+            if (btn && !btn.classList.contains('flip')) {
+                btn.disabled = true;
+            }
+        }
+    }
+
+    // 修改 enableRemainingCards 函数
+    function enableRemainingCards() {
+        for (let i = 1; i <= 10; i++) {
+            let btn = document.getElementById('my' + i);
+            if (btn && !btn.classList.contains('flip')) {
+                btn.disabled = false;
+            }
+        }
+    }
+
+    // 回到主页
+    function goHome() {
+        const overlay = document.getElementById('resultOverlay');
+        overlay.classList.remove('show');
+        
+        // 关闭当前的 WebSocket 连接
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+            websocket.close();
+        }
+        if (websocket4Room && websocket4Room.readyState === WebSocket.OPEN) {
+            websocket4Room.close();
+        }
+        
+        // 跳转到房间页面
+        window.location.href = 'room.html';
+    }
+
+    // 请求继续游戏
+    function requestRematch() {
+        let rematchRequest = {
+            type: 'rematch_request',
+            deviceId: deviceId,
+            nickName: document.getElementById("myName").textContent.replace('我: ', '')
+        };
+        websocket4Room.send(JSON.stringify(rematchRequest));
+        // 禁用继续游戏按钮，避免重复请求
+        document.querySelector('#answer button.btn-success').disabled = true;
+    }
+
+    // 接受继续游戏
+    function acceptRematch() {
+        let response = {
+            type: 'rematch_accept',
+            deviceId: deviceId,
+            nickName: document.getElementById("myName").textContent.replace('我: ', '')
+        };
+        websocket4Room.send(JSON.stringify(response));
+        document.getElementById("rematchRequest").style.visibility = "hidden";
+        resetGameState();
+    }
+
+    // 拒绝继续游戏
+    function rejectRematch() {
+        let response = {
+            type: 'rematch_reject',
+            deviceId: deviceId,
+            nickName: document.getElementById("myName").textContent.replace('我: ', '')
+        };
+        websocket4Room.send(JSON.stringify(response));
+        document.getElementById("rematchRequest").style.visibility = "hidden";
+    }
+
+    // 修改 resetGameState 函数
+    function resetGameState() {
+        hasPlayedThisRound = false;
+        
+        for (let i = 1; i <= 10; i++) {
+            let myBtn = document.getElementById('my' + i);
+            let oppBtn = document.getElementById('opp' + i);
+            
+            if (myBtn) {
+                myBtn.classList.remove('flip');
+                myBtn.disabled = false;
+            }
+            if (oppBtn) {
+                oppBtn.classList.remove('flip');
+                oppBtn.disabled = true;
+            }
+        }
+
+        document.getElementById("answer").style.visibility = "hidden";
+        document.getElementById("point").style.visibility = "hidden";
+    }
+
+    // 修改显示结果的函数
+    function showResult(text, isWin) {
+        const overlay = document.getElementById('resultOverlay');
+        const resultBox = document.getElementById('resultBox');
+        const resultText = document.getElementById('resultText');
+        
+        resultText.textContent = text;
+        resultText.style.color = isWin ? '#28a745' : '#dc3545';
+        overlay.classList.add('show');
+    }
+
+    // 修改隐藏结果的函数
+    function hideResult() {
+        const overlay = document.getElementById('resultOverlay');
+        overlay.classList.remove('show');
+    }
+
+    // 添加播放音效的函数
+    function playMoveSound() {
+        const sound = document.getElementById('moveSound');
+        sound.currentTime = 0; // 重置音频
+        sound.play().catch(e => console.log('播放音效失败:', e));
+    }
 
 </script>
 

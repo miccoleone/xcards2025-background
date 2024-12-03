@@ -77,25 +77,18 @@ public class WebSocket4Game {
 
         // 获取对应房间ID
         Long roomId = deviceId2RoomIdMap.get(user.deviceId);
+        if (roomId == null) return;
 
-        // 获取对应房间的 GameState，若没有则创建一个新的 GameState
-        GameState gameState = roomStataMap.get(roomId);
-        if (gameState == null) {
-            gameState = new GameState();
-            roomStataMap.put(roomId, gameState);
-        }
+        // 获取或创建游戏状态
+        GameState gameState = roomStataMap.computeIfAbsent(roomId, k -> new GameState());
 
         // 获取当前回合数 m 和对方的出牌
         Integer m = gameState.m;
         Integer otherCard = gameState.otherCard;
 
         Integer card = user.card;
-
-        // 打印调试信息
         log.error("/game - m的值为： ".concat(String.valueOf(m)));
         m++;  // 增加回合数 m
-
-        // 更新 gameState 中的 m 值
         gameState.m = m;
 
         log.info("/game - 出牌消息:{}", message);
@@ -105,9 +98,11 @@ public class WebSocket4Game {
 
             // 向房间内的所有玩家发送消息
             roomId2UserListMap.get(roomId).forEach(e -> {
-                log.info("/game ---------- 出牌消息 user：{}, card: {}, userRole:{}, sessionId:{}", e.nickName, e.card,e.role, e.session.getId());
-                sendMessage(deviceId2SessionMap_Game.get(e.getDeviceId()), card.toString());
-                sendMessage(deviceId2SessionMap_Game.get(e.getDeviceId()), finalOtherCard.toString());
+                Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
+                if (playerSession != null) {
+                    sendMessage(playerSession, card.toString());
+                    sendMessage(playerSession, finalOtherCard.toString());
+                }
             });
 
             // 红色方上点数1-10 蓝色方在下 点数11-20
@@ -125,23 +120,34 @@ public class WebSocket4Game {
             if (!(redcard == 1 || bluecard == 11)) {
                 if (redcard / (bluecard - TEN) >= 2) {
                     roomId2UserListMap.get(roomId).forEach(e -> {
-                        sendMessage(deviceId2SessionMap_Game.get(e.getDeviceId()), RED_WIN);
+                        Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
+                        if (playerSession != null) {
+                            sendMessage(playerSession, RED_WIN);
+                        }
                     });
                 } else if ((bluecard - 10) / redcard >= 2) {
                     roomId2UserListMap.get(roomId).forEach(e -> {
-                        sendMessage(deviceId2SessionMap_Game.get(e.getDeviceId()), BLUE_WIN);
+                        Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
+                        if (playerSession != null) {
+                            sendMessage(playerSession, BLUE_WIN);
+                        }
                     });
                     // todo 清理一些map/session/websocket等等工作
                 }
             }
-        } else {  // 如果是第一次出牌，存储这张牌
-            gameState.otherCard = card;  // 更新 otherCard
-
+        } else {  // 第一次出牌
+            gameState.otherCard = card;
+            
             // 提示对方出牌
             roomId2UserListMap.get(roomId)
                     .stream()
-                    .filter(e -> !e.deviceId.equals(user.deviceId))  // 过滤掉当前玩家
-                    .forEach(e -> sendMessage(deviceId2SessionMap_Game.get(e.getDeviceId()), PLEASE_TAKE_CARD));
+                    .filter(e -> !e.deviceId.equals(user.deviceId))
+                    .forEach(e -> {
+                        Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
+                        if (playerSession != null) {
+                            sendMessage(playerSession, PLEASE_TAKE_CARD);
+                        }
+                    });
         }
     }
 
@@ -162,5 +168,13 @@ public class WebSocket4Game {
             }
         }
         return null;
+    }
+
+    // 添加重置游戏状态的方法
+    public static void resetGameState(Long roomId) {
+        GameState gameState = roomStataMap.get(roomId);
+        if (gameState != null) {
+            gameState.reset();
+        }
     }
 }

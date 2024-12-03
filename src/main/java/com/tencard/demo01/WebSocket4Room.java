@@ -83,6 +83,14 @@ public class WebSocket4Room {
     public void onMessage(String message, Session session) throws IOException {
         log.info("/room - message内容为：{} ", message);
         User user = JSON.parseObject(message, User.class);
+        
+        // 处理继续游戏相关的消息
+        if (user.type != null) {
+            handleRematch(user);
+            return;
+        }
+
+        // 原有的房间匹配逻辑保持不变
         if (user.deviceId == null || user.roomCode == null) return;
 //        user.setNickName("xiaohua");
         user.setWinRate(49);
@@ -90,6 +98,7 @@ public class WebSocket4Room {
         user.setSessionId(session.getId());
         log.info("/room ======== user为：{} =========== ", user);
         if (roomCode2RoomIdMap.containsKey(user.roomCode)) { // 已经创建过房间
+            //todo 房间已满
             // 红色方
             user.setRole(GameUtil.RoleEnum.redSide.toString());
             // 后进入游戏的玩家到场 给双发发送消息，让两人的页面都显示对方的信息
@@ -133,6 +142,84 @@ public class WebSocket4Room {
 
         }catch (Exception e){
             log.error("/room //////////////  updateBluePlayerSessionData error : {}",e.toString());
+        }
+    }
+
+    private void handleRematch(User user) {
+        try {
+            // 获取当前房间ID
+            Long roomId = deviceId2RoomIdMap.get(user.deviceId);
+            if (roomId == null) {
+                log.warn("/room - Cannot find roomId for deviceId: {}", user.deviceId);
+                return;
+            }
+
+            // 获取房间内的玩家列表
+            List<User> users = roomId2UserListMap.get(roomId);
+            if (users == null || users.size() != 2) {
+                log.warn("/room - Invalid user count in room: {}", roomId);
+                return;
+            }
+
+            // 获取对手的User对象
+            User opponent = users.stream()
+                    .filter(u -> !u.deviceId.equals(user.deviceId))
+                    .findFirst()
+                    .orElse(null);
+
+            if (opponent == null) {
+                log.warn("/room - Cannot find opponent for user: {}", user.deviceId);
+                return;
+            }
+
+            Session opponentSession = deviceId2SessionMap_Room.get(opponent.deviceId);
+            Session currentSession = deviceId2SessionMap_Room.get(user.deviceId);
+
+            switch (user.type) {
+                case "rematch_request":
+                    // 转发继续游戏请求给对手
+                    if (opponentSession != null && opponentSession.isOpen()) {
+                        GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
+                    }
+                    break;
+
+                case "rematch_accept":
+                    // 通知双方重置游戏状态
+                    if (currentSession != null && currentSession.isOpen()) {
+                        GameUtil.sendMessage(currentSession, JSON.toJSONString(user));
+                    }
+                    if (opponentSession != null && opponentSession.isOpen()) {
+                        GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
+                    }
+                    // 重置游戏状态
+                    WebSocket4Game.resetGameState(roomId);
+                    break;
+
+                case "rematch_reject":
+                    // 通知请求方对方拒绝
+                    if (opponentSession != null && opponentSession.isOpen()) {
+                        GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
+                    }
+                    break;
+            }
+        } catch (Exception e) {
+            log.error("/room - Error handling rematch: {}", e.getMessage(), e);
+        }
+    }
+
+    private void sendMessage(Session session, String message) {
+        try {
+            session.getBasicRemote().sendText(message);
+        } catch (IOException e) {
+            log.error("/room - Error sending message: {}", e.getMessage());
+        }
+    }
+
+    private void sendMessage(Session session, List<User> users) {
+        try {
+            session.getBasicRemote().sendText(JSON.toJSONString(users));
+        } catch (IOException e) {
+            log.error("/room - Error sending message: {}", e.getMessage());
         }
     }
 }
