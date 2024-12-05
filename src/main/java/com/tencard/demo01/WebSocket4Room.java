@@ -98,29 +98,37 @@ public class WebSocket4Room {
         user.setSessionId(session.getId());
         log.info("/room ======== user为：{} =========== ", user);
         if (roomCode2RoomIdMap.containsKey(user.roomCode)) { // 已经创建过房间
-            //todo 房间已满
+            Long roomId = roomCode2RoomIdMap.get(user.roomCode);
+            List<User> existingUsers = roomId2UserListMap.get(roomId);
+            
+            // 检查房间是否已满
+            if (existingUsers != null && existingUsers.size() >= 2) {
+                // 发送房间已满的消息
+                User response = new User();
+                response.setType("room_full");
+                sendMessage(session, JSON.toJSONString(response));
+                return;
+            }
+            
             // 红色方
             user.setRole(GameUtil.RoleEnum.redSide.toString());
             // 后进入游戏的玩家到场 给双发发送消息，让两人的页面都显示对方的信息
             user.setMsgCode(GameUtil.RED_JOIN_GAME); // 60
-            Long roomId = roomCode2RoomIdMap.get(user.roomCode);
             deviceId2RoomIdMap.put(user.deviceId,roomId);
             roomId2UserListMap.computeIfAbsent(roomId, k -> new ArrayList<>()).add(user);
             updateBluePlayerSessionData(roomId2UserListMap,roomId);// 更新房主的session信息
 
-            // <10001L,List<user> users>
-            List<User> users = roomId2UserListMap.get(roomId);
-            users.forEach(e -> {
+            // 获取最新的用户列表
+            final List<User> updatedUsers = roomId2UserListMap.get(roomId);
+            updatedUsers.forEach(e -> {
                 /**
                  * 这里的逻辑是：1.红色方的room.html接到信息，它跳转到游戏画面展示双方信息
                  *            2.蓝色方(房主)在游戏页面接收到websocket的onmessage对手信息，要显示敌方信息
                  *  */
                 if(e.session == null) return;
                 log.info("/room ---------- 发送消息 sessionId: {},userRole:{}", e.session.getId(), e.role);
-                sendMessage(e.session, users);
-            }
-
-            );
+                sendMessage(e.session, updatedUsers);
+            });
         } else {
             // 新建一个房间Id 蓝色方
             user.setRole(GameUtil.RoleEnum.blueSide.toString());

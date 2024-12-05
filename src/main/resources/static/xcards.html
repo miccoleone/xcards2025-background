@@ -746,7 +746,7 @@
         const sound = document.getElementById('clickSound');
         sound.volume = 0.5;  // 设置音量为50%
         sound.currentTime = 0;  // 重置音频
-        sound.play().catch(e => console.log('播放音效失败:', e));
+        sound.play().catch(e => console.log('播放音效��败:', e));
     }
 
     // 修改加入房间函数
@@ -757,7 +757,7 @@
             return;
         }
 
-        // 播放点���音效
+        // 播放点音效
         playClickSound();
 
         // 显示加载提示
@@ -790,6 +790,19 @@
         sound.volume = 0.5;
         sound.currentTime = 0;
         sound.play().catch(e => console.log('播放音效失败:', e));
+    }
+
+    function showRoomFullTip() {
+        const tip = document.getElementById('roomFullTip');
+        tip.classList.add('show');
+        
+        // 1.5秒后隐藏提示
+        setTimeout(() => {
+            tip.classList.remove('show');
+            // 恢复按钮和加载提示的状态
+            document.getElementById("loadingMessage").style.display = "none";
+            document.getElementById("joinBtn").disabled = false;
+        }, 1500);
     }
 
 </script>

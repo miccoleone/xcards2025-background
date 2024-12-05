@@ -62,9 +62,26 @@
             font-size: 18px;
             margin-bottom: 20px;
         }
+        /* 添加房间已满提示层样式 */
+        .room-full-tip {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-out;
+        }
 
-
-
+        .room-full-tip.show {
+            opacity: 1;
+            visibility: visible;
+        }
     </style>
 </head>
 <body>
@@ -80,6 +97,10 @@
     </div>
 </div>
 
+<div class="room-full-tip" id="roomFullTip">
+    房间已满
+</div>
+
 <audio id="clickSound" preload="auto">
     <source src="audio/click.mp3" type="audio/mpeg">
 </audio>
@@ -90,24 +111,43 @@
 //    let websocket = new WebSocket(`ws://118.31.102.119:4396/room?deviceId=${deviceId}`);
     let websocket = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
 
+    // 添加显示房间已满提示的函数
+    function showRoomFullTip() {
+        const tip = document.getElementById('roomFullTip');
+        tip.classList.add('show');
+        
+        // 1.5秒后隐藏提示
+        setTimeout(() => {
+            tip.classList.remove('show');
+            // 恢复按钮和加载提示的状态
+            document.getElementById("loadingMessage").style.display = "none";
+            document.getElementById("joinBtn").disabled = false;
+        }, 1500);
+    }
 
     websocket.onmessage = function(event) {
-        let users = JSON.parse(event.data);
-        console.log('room.html - onmessage: ', users);
+        let data = JSON.parse(event.data);
+        console.log('room.html - onmessage: ', data);
+
+        // 检查是否是房间已满的消息
+        if (data.type === 'room_full') {
+            showRoomFullTip();
+            return;
+        }
 
         let playerData = {};  // 用于存储玩家信息
         let queryString;
 
-        if (users.length === 1) {  // 蓝色方：只有一个玩家的数据
-            let user = users[0]; // 获取蓝色方玩家数据
+        if (data.length === 1) {  // 蓝色方：只有一个玩家的数据
+            let user = data[0]; // 获取蓝色方玩家数据
             playerData = {
                 msgCode: user.msgCode,           // 消息码 (50)
                 blueNickName: user.nickName,     // 蓝色方昵称
                 blueWinRate: user.winRate,      // 蓝色方胜率
             };
-        } else if (users.length === 2) {  // 红色方：两个玩家的数据
-            let blueUser = users[0];  // 蓝色方玩家数据
-            let redUser = users[1];   // 红色方玩家数据
+        } else if (data.length === 2) {  // 红色方：两个玩家的数据
+            let blueUser = data[0];  // 蓝色方玩家数据
+            let redUser = data[1];   // 红色方玩家数据
 
             playerData = {
                 msgCode: redUser.msgCode,  // 消息码 (60)
@@ -117,7 +157,7 @@
                 redWinRate: redUser.winRate    // 红色方胜率
             };
         } else {
-                console.error('Unexpected number of users: ' + users.length);
+                console.error('Unexpected number of users: ' + data.length);
                 return; // 如果不是 1 或 2，直接返回，避免错误
         }
 
@@ -196,7 +236,7 @@
     function getNickname() {
         let nickname = localStorage.getItem("nickname");
         if (!nickname) {
-            nickname = prompt("请输入您的昵称：");
+            nickname = prompt("请输入您的���称：");
             if (nickname) {
                 localStorage.setItem("nickname", nickname);
             } else {
