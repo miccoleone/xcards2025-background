@@ -57,49 +57,55 @@
             display: block;
         }
 
+        /* 添加中央出牌区域 */
+        .center-area {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+        }
+
         /* 卡牌基础样式 */
         .card-side button {
-            transition: all 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            transition: all 0.3s ease-out;
             position: relative;
             transform-origin: center center;
             background: white;
             border: 1px solid #ccc;
         }
 
-        /* 卡牌点击动画 */
+        /* 出牌动画 */
         .card-side button.flip {
-            animation: cardPlay 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+            animation: throwCard 1.8s cubic-bezier(0.23, 1, 0.32, 1);
             background-color: grey !important;
         }
 
-        /* 修改动画关键帧 */
-        @keyframes cardPlay {
+        /* 丢牌动画关键帧 */
+        @keyframes throwCard {
             0% {
-                transform: scale(1.2) translateY(-20px);
+                transform: scale(1) translate(0, 0);
+                opacity: 1;
+            }
+            30% {
+                transform: scale(1.2) translate(0, -20px);
+                opacity: 1;
                 box-shadow: 0 15px 15px rgba(0,0,0,0.2);
             }
-            100% {
-                transform: scale(1) translateY(0);
-                box-shadow: 0 0 0 rgba(0,0,0,0);
+            50% {
+                transform: scale(1.1) translate(var(--throw-x), var(--throw-y));
+                opacity: 1;
+                box-shadow: 0 8px 12px rgba(0,0,0,0.15);
             }
-        }
-
-        /* 添加按钮悬停效果 */
-        .card-side button:not(.flip):hover {
-            transform: translateY(-2px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            cursor: pointer;
-        }
-
-        /* 添加按钮按下效果 */
-        .card-side button:not(.flip):active {
-            transform: translateY(1px);
-            box-shadow: 0 0 2px rgba(0,0,0,0.1);
-        }
-
-        /* 确保翻转时文字不会镜像 */
-        .card-side button span {
-            backface-visibility: hidden;
+            80% {
+                transform: scale(1.1) translate(var(--throw-x), var(--throw-y));
+                opacity: 1;
+                box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+            }
+            100% {
+                transform: scale(0.9) translate(var(--throw-x), var(--throw-y));
+                opacity: 0;
+            }
         }
 
         /* 整体容器样式 */
@@ -113,7 +119,7 @@
         .card-side {
             display: flex;
             justify-content: center;
-            gap: 15px;         /* 卡牌之间的间距 */
+            gap: 15px;         /* 卡牌 */
             margin: 8px 0;    /* 上下行之间的间距 */
         }
 
@@ -148,6 +154,34 @@
                 font-size: 16px;
                 padding: 8px;
             }
+        }
+
+        /* 添加游戏开始提示层样式 */
+        .start-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px 30px;
+            border-radius: 8px;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .start-text {
+            color: white;
+            font-size: 24px;
+            font-weight: normal;
+            text-align: center;
+            margin: 0;
+        }
+
+        .start-overlay.show {
+            opacity: 1;
+            visibility: visible;
         }
     </style>
 </head>
@@ -189,7 +223,7 @@
             </div>
             <div id="answer" aria-hidden="true" style="visibility: hidden;">
                 <button onclick="goHome()" type="button" class="btn btn-primary" style="margin-right: 10px;">主页</button>
-                <button onclick="requestRematch()" type="button" class="btn btn-success">继续游戏</button>
+                <button onclick="requestRematch()" type="button" class="btn btn-success">继续游</button>
             </div>
             <div id="rematchRequest" aria-hidden="true" style="visibility: hidden;">
                 <p style="margin-bottom: 10px;">对手请求继续游戏</p>
@@ -240,8 +274,27 @@
     </div>
 </div>
 
-<audio id="moveSound" preload="auto">
-    <source src="footstep.mp3" type="audio/mpeg">
+<div class="start-overlay" id="startOverlay">
+    <div class="start-text">游戏开始！</div>
+</div>
+
+<audio id="footstepSound" preload="auto">
+    <source src="audio/footstep.mp3" type="audio/mpeg">
+</audio>
+<audio id="sendCardSound" preload="auto">
+    <source src="audio/sendCard.mp3" type="audio/mpeg">
+</audio>
+<audio id="startSound" preload="auto">
+    <source src="audio/start.mp3" type="audio/mpeg">
+</audio>
+<audio id="clickSound" preload="auto">
+    <source src="audio/click.mp3" type="audio/mpeg">
+</audio>
+<audio id="victorySound" preload="auto">
+    <source src="audio/victory.mp3" type="audio/mpeg">
+</audio>
+<audio id="defeatSound" preload="auto">
+    <source src="audio/defeat.mp3" type="audio/mpeg">
 </audio>
 
 <script>
@@ -253,11 +306,13 @@
     let receivedCardsCount = 0;  // 新增：用于跟踪本轮收到的牌数
 
     // 创建游戏 WebSocket连接
+//    websocket = new WebSocket(`ws://118.31.102.119:4396/game?deviceId=${deviceId}`);
     websocket = new WebSocket(`ws://localhost:4396/game?deviceId=${deviceId}`);
     websocket.onopen = function (event) {
         console.log('websocket connection opened - websocket ');
     }
     // 创建房间控制 WebSocket连接
+//    websocket4Room = new WebSocket(`ws://118.31.102.119:4396/room?deviceId=${deviceId}`);
     websocket4Room = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
     websocket4Room.onopen = function() {
         console.log('websocket4Room connection opened - room');
@@ -296,7 +351,7 @@
                 break;
 
             case '200':
-                // 延迟显示失败结果
+                // 延迟示失败结果
                 setTimeout(() => {
                     showResult(isRedSide ? "失败！" : "胜利！", !isRedSide);
                     document.getElementById("answer").style.visibility = "visible";
@@ -305,10 +360,19 @@
                 }, 1500);
                 break;
 
+            case '600':
+                // 延显示平局结果
+                setTimeout(() => {
+                    showResult("双赢！", true);  // 使用胜利的样式显示
+                    document.getElementById("answer").style.visibility = "visible";
+                    disableAllMyCards();
+                    document.getElementById("point").style.visibility = "hidden";
+                }, 1500);
+                break;
+
             case '300':
-                // 仅显示提示，不做其他处理
                 document.getElementById("point").style.visibility = "visible";
-                playMoveSound();
+                playFootstepSound();
                 break;
 
             default:
@@ -328,6 +392,10 @@
 
                     const button = document.getElementById(buttonId);
                     if (button) {
+                        const { x, y } = calculateThrowPosition(button);
+                        button.style.setProperty('--throw-x', `${x}px`);
+                        button.style.setProperty('--throw-y', `${y}px`);
+                        
                         button.classList.add('flip');
                         button.disabled = true;
                     }
@@ -335,7 +403,7 @@
                     // 计数收到的牌
                     receivedCardsCount++;
                     
-                    // 当收到两张牌时，说明本轮结束
+                    // 当收到两张时，说明本轮结束
                     if (receivedCardsCount === 2) {
                         receivedCardsCount = 0;  // 重置计数
                         hasPlayedThisRound = false;  // 重置出牌状态
@@ -353,7 +421,7 @@
         let data = JSON.parse(event.data);
         console.log('来自房间控制的消息:', data);
 
-        // 处理数组类型的消息（原有的红方加入逻辑）
+        // 处理数组类型的消息（原有红方加入逻辑）
         if (Array.isArray(data)) {
             let redUser = data[1];
             if (redUser && redUser.msgCode === '60') {
@@ -370,8 +438,8 @@
                 break;
 
             case 'rematch_accept':
-                // 对方接受继续游戏
-                alert("对手同意继续游戏！");
+                // 对方接继续游戏
+                alert("手同意继续游戏！");
                 resetGameState();
                 break;
 
@@ -383,22 +451,42 @@
         }
     };
 
-    // 修改发牌函数，添加翻转动画
+    // 计算牌飞向中心的位置
+    function calculateThrowPosition(button) {
+        const rect = button.getBoundingClientRect();
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        
+        const throwX = centerX - (rect.left + rect.width / 2);
+        const throwY = centerY - (rect.top + rect.height / 2);
+        
+        return { x: throwX, y: throwY };
+    }
+
+    // 修改出牌函数
     function sendCard(cardId) {
         if (hasPlayedThisRound) {
             alert("本轮已经出过牌了，请等待新的回合！");
             return;
         }
 
-        let msgCode = getQueryParam("msgCode");
-        let actualCardId = msgCode === "60" ? cardId : (cardId + 10);
-        
         const button = document.getElementById('my' + cardId);
         if (button) {
+            // 播放出牌音效
+            playCardSound();
+            
+            // 计算飞向中心的位置
+            const { x, y } = calculateThrowPosition(button);
+            button.style.setProperty('--throw-x', `${x}px`);
+            button.style.setProperty('--throw-y', `${y}px`);
+            
             button.classList.add('flip');
             button.disabled = true;
         }
 
+        let msgCode = getQueryParam("msgCode");
+        let actualCardId = msgCode === "60" ? cardId : (cardId + 10);
+        
         let playerData = {
             nickName: getQueryParam(msgCode === "60" ? "redNickName" : "blueNickName"),
             role: msgCode === "60" ? "redSide" : "blueSide",
@@ -413,13 +501,13 @@
         disableAllMyCards();
     }
 
-    // 获取 URL 中的查询参数
+    // 获 URL 中的查询参数
     function getQueryParam(param) {
         const urlParams = new URLSearchParams(window.location.search);
         return urlParams.get(param);
     }
 
-    // 页面加载完成时获取参数并显示信息
+    // 页面加载完成时获取参数并显示信
     window.onload = function() {
         let msgCode = getQueryParam("msgCode");
         let isRedSide = msgCode === "60";
@@ -431,11 +519,13 @@
             myWinRate = getQueryParam("redWinRate");
             opponentNickName = getQueryParam("blueNickName");
             opponentWinRate = getQueryParam("blueWinRate");
+            showGameStart();  // 红方进入时显示游戏开始提示
         } else {
             // 如果是蓝方
             myNickName = getQueryParam("blueNickName");
             myWinRate = getQueryParam("blueWinRate");
             document.getElementById("waitAnotherPlayer").style.visibility = "visible";
+            disableAllMyCards();
         }
 
         // 显示玩家信息
@@ -444,17 +534,17 @@
         
         if (opponentNickName) {
             document.getElementById("opponentName").textContent = `对手: ${opponentNickName}`;
-            document.getElementById("opponentWinRate").textContent = `胜率: ${opponentWinRate}%`;
+            document.getElementById("opponentWinRate").textContent = `率: ${opponentWinRate}%`;
         }
 
         // 显示牌面
         document.getElementById("mySide").style.visibility = "visible";
         if (opponentNickName) {
             document.getElementById("opponentSide").style.visibility = "visible";
+            enableRemainingCards();  // 只有在对手存在时才启用牌
+        } else {
+            disableAllMyCards();  // 如果对手不存在，禁用所有牌
         }
-        
-        // 初始时启用所有牌（因为是新的一轮）
-        enableRemainingCards();
     };
 
     function redSideJoin(redUser) {
@@ -464,6 +554,8 @@
             document.getElementById("opponentName").textContent = `对手: ${redUser.nickName}`;
             document.getElementById("opponentWinRate").textContent = `胜率: ${redUser.winRate}%`;
             document.getElementById("opponentSide").style.visibility = "visible";
+            enableRemainingCards();  // 当红方加入时，启用蓝方的牌
+            showGameStart();  // 显示游戏开始提示
         }
     }
 
@@ -498,6 +590,9 @@
 
     // 回到主页
     function goHome() {
+        // 播放点击音效
+        playClickSound();
+        
         const overlay = document.getElementById('resultOverlay');
         overlay.classList.remove('show');
         
@@ -515,6 +610,9 @@
 
     // 请求继续游戏
     function requestRematch() {
+        // 播放点击音效
+        playClickSound();
+        
         let rematchRequest = {
             type: 'rematch_request',
             deviceId: deviceId,
@@ -527,6 +625,9 @@
 
     // 接受继续游戏
     function acceptRematch() {
+        // 播放点击音效
+        playClickSound();
+        
         let response = {
             type: 'rematch_accept',
             deviceId: deviceId,
@@ -539,6 +640,9 @@
 
     // 拒绝继续游戏
     function rejectRematch() {
+        // 播放点击音效
+        playClickSound();
+        
         let response = {
             type: 'rematch_reject',
             deviceId: deviceId,
@@ -570,7 +674,7 @@
         document.getElementById("point").style.visibility = "hidden";
     }
 
-    // 修改显示结果的函数
+    // 修改示结果的函数
     function showResult(text, isWin) {
         const overlay = document.getElementById('resultOverlay');
         const resultBox = document.getElementById('resultBox');
@@ -579,6 +683,15 @@
         resultText.textContent = text;
         resultText.style.color = isWin ? '#28a745' : '#dc3545';
         overlay.classList.add('show');
+
+        // 播放对应的音效
+        if (text === "双赢！") {
+            playVictorySound();
+        } else if (isWin) {
+            playVictorySound();
+        } else {
+            playDefeatSound();
+        }
     }
 
     // 修改隐藏结果的函数
@@ -589,8 +702,93 @@
 
     // 添加播放音效的函数
     function playMoveSound() {
-        const sound = document.getElementById('moveSound');
+        const sound = document.getElementById('footstepSound');
         sound.currentTime = 0; // 重置音频
+        sound.play().catch(e => console.log('播放音效失败:', e));
+    }
+
+    // 添加播放脚步声的函数
+    function playFootstepSound() {
+        const sound = document.getElementById('footstepSound');
+        sound.volume = 0.6;  // 设置音量为60%
+        sound.currentTime = 0;  // 重置音频
+        sound.play().catch(e => console.log('播放音效失败:', e));
+    }
+
+    // 添加播放出牌音效的函数
+    function playCardSound() {
+        const sound = document.getElementById('sendCardSound');
+        sound.volume = 0.6;  // 设置音量为60%
+        sound.currentTime = 0;  // 重置音频
+        sound.play().catch(e => console.log('播放音效失败:', e));
+    }
+
+    // 添加游戏开始提示和音效的函数
+    function showGameStart() {
+        const overlay = document.getElementById('startOverlay');
+        const startSound = document.getElementById('startSound');
+        
+        // 显示开始提示
+        overlay.classList.add('show');
+        
+        // 播放开始音效
+        startSound.volume = 0.5;  // 稍微调低音量
+        startSound.play().catch(e => console.log('播放音效失败:', e));
+        
+        // 1.5秒后隐藏提示
+        setTimeout(() => {
+            overlay.classList.remove('show');
+        }, 1500);
+    }
+
+    // 添加播放点击音效的函数
+    function playClickSound() {
+        const sound = document.getElementById('clickSound');
+        sound.volume = 0.5;  // 设置音量为50%
+        sound.currentTime = 0;  // 重置音频
+        sound.play().catch(e => console.log('播放音效失败:', e));
+    }
+
+    // 修改加入房间函数
+    function joinRoom() {
+        let roomCode = document.getElementById("roomCodeInput").value.trim();
+        if (!roomCode) {
+            alert("请输入房间号！");
+            return;
+        }
+
+        // 播放点���音效
+        playClickSound();
+
+        // 显示加载提示
+        document.getElementById("loadingMessage").style.display = "block";
+        document.getElementById("joinBtn").disabled = true;
+
+        // 构造交互对象
+        let playerData = {
+            deviceId: deviceId,
+            roomCode: roomCode,
+            userCode: '',
+            nickName: getNickname(),
+        };
+
+        // 与后端WebSocket交互
+        websocket.send(JSON.stringify(playerData));
+    }
+
+    // 添加播放胜利音效的函数
+    function playVictorySound() {
+        const sound = document.getElementById('victorySound');
+        sound.volume = 0.5;
+        sound.currentTime = 0;
+        sound.play().catch(e => console.log('播放音效失败:', e));
+    }
+
+    // 添加播放失败音效的函数
+    function playDefeatSound() {
+        const sound = document.getElementById('defeatSound');
+        sound.volume = 0.5;
+        sound.currentTime = 0;
         sound.play().catch(e => console.log('播放音效失败:', e));
     }
 

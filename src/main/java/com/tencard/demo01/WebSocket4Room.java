@@ -115,6 +115,7 @@ public class WebSocket4Room {
                  * 这里的逻辑是：1.红色方的room.html接到信息，它跳转到游戏画面展示双方信息
                  *            2.蓝色方(房主)在游戏页面接收到websocket的onmessage对手信息，要显示敌方信息
                  *  */
+                if(e.session == null) return;
                 log.info("/room ---------- 发送消息 sessionId: {},userRole:{}", e.session.getId(), e.role);
                 sendMessage(e.session, users);
             }

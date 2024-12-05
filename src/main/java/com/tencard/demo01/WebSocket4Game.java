@@ -132,7 +132,31 @@ public class WebSocket4Game {
                             sendMessage(playerSession, BLUE_WIN);
                         }
                     });
-                    // todo 清理一些map/session/websocket等等工作
+                } else if (gameState.m >= 20) {  // 如果已经是最后一轮
+                    // 判断点数大小
+                    if (redcard > (bluecard - TEN)) {
+                        roomId2UserListMap.get(roomId).forEach(e -> {
+                            Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
+                            if (playerSession != null) {
+                                sendMessage(playerSession, RED_WIN);
+                            }
+                        });
+                    } else if (redcard < (bluecard - TEN)) {
+                        roomId2UserListMap.get(roomId).forEach(e -> {
+                            Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
+                            if (playerSession != null) {
+                                sendMessage(playerSession, BLUE_WIN);
+                            }
+                        });
+                    } else {
+                        // 点数相等，平局
+                        roomId2UserListMap.get(roomId).forEach(e -> {
+                            Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
+                            if (playerSession != null) {
+                                sendMessage(playerSession, "600");  // WIN_WIN
+                            }
+                        });
+                    }
                 }
             }
         } else {  // 第一次出牌

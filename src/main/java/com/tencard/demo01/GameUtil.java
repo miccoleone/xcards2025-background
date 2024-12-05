@@ -20,6 +20,8 @@ public class GameUtil {
     public static final String BLUE_WIN = "200";
     // 请出牌
     public static final String PLEASE_TAKE_CARD = "300";
+    // 平局
+    public static final String WIN_WIN = "600";
 //    // 隐藏请出牌三个字
 //    public static final String HIDDEN_PLEASE_TAKE_CARD = "400";
 

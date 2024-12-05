@@ -80,9 +80,14 @@
     </div>
 </div>
 
+<audio id="clickSound" preload="auto">
+    <source src="audio/click.mp3" type="audio/mpeg">
+</audio>
+
 <script>
 
     let deviceId = localStorage.getItem("deviceId") || generateDeviceId(); // 获取生成的设备Id
+//    let websocket = new WebSocket(`ws://118.31.102.119:4396/room?deviceId=${deviceId}`);
     let websocket = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
 
 
@@ -168,6 +173,9 @@
             return;
         }
 
+        // 播放点击音效
+        playClickSound();
+
         // 显示加载提示
         document.getElementById("loadingMessage").style.display = "block";
         document.getElementById("joinBtn").disabled = true;
@@ -196,6 +204,14 @@
             }
         }
         return nickname;
+    }
+
+    // 添加播放点击音效的函数
+    function playClickSound() {
+        const sound = document.getElementById('clickSound');
+        sound.volume = 0.5;  // 设置音量为50%
+        sound.currentTime = 0;  // 重置音频
+        sound.play().catch(e => console.log('播放音效失败:', e));
     }
 
     window.onbeforeunload = function () {
