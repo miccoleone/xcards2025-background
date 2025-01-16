@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>十张牌</title>
+    <!-- 基础样式和脚本 -->
+    <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuid.min.js"></script>
+    <script src="./util/utils.js"></script>
+    <link href="https://cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/mystyle.css" rel="stylesheet">
+    <script src="http://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script src="http://libs.baidu.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+</head>
+<body>
+    <!-- 房间页面 -->
+    <div id="roomPage" class="page active">
+        <div class="game-container">
+            <h1>十张牌</h1>
+            <div class="input-container">
+                <input type="number" id="roomCodeInput" placeholder="请输入房间号" autofocus>
+                <button id="joinBtn">进入游戏</button>
+            </div>
+            <div id="loadingMessage" style="display: none; color: #333; font-size: 18px; margin-top: 20px;">
+                正在进入房间...
+            </div>
+        </div>
+        <div class="room-full-tip" id="roomFullTip">
+            房间已满
+        </div>
+    </div>
+    
+    <!-- 游戏页面 -->
+    <div id="gamePage" class="page">
+        <div class="container-fluid">
+            <div class="row clearfix" style="text-align: center">
+                <div id="opponentSide" style="display: none;">
+                    <div class="col-md-24 column">
+                        <br>
+                        <div class="player-name" style="color: red" id="opponentName"></div>
+                        <div id="opponentWinRate"></div>
+                        <br>
+                        <div class="card-side">
+                            <button id="opp1" type="button" class="btn btn-default" disabled>1</button>
+                            <button id="opp2" type="button" class="btn btn-default" disabled>2</button>
+                            <button id="opp3" type="button" class="btn btn-default" disabled>3</button>
+                            <button id="opp4" type="button" class="btn btn-default" disabled>4</button>
+                            <button id="opp5" type="button" class="btn btn-default" disabled>5</button>
+                        </div>
+                    </div>
+                    <br>
+                    <div class="col-md-24 column">
+                        <div class="card-side">
+                            <button id="opp6" type="button" class="btn btn-default" disabled>6</button>
+                            <button id="opp7" type="button" class="btn btn-default" disabled>7</button>
+                            <button id="opp8" type="button" class="btn btn-default" disabled>8</button>
+                            <button id="opp9" type="button" class="btn btn-default" disabled>9</button>
+                            <button id="opp10" type="button" class="btn btn-default" disabled>10</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="centerSide">
+                    <br>
+                    <br>
+                    <div id="waitAnotherPlayer" style="display: none;">
+                        <button type="button" class="btn btn-primary">等待对手进入...</button>
+                    </div>
+                    <div id="answer" style="display: none;">
+                        <button onclick="goHome()" type="button" class="btn btn-primary" style="margin-right: 10px;">主页</button>
+                        <button onclick="requestRematch()" type="button" class="btn btn-success">继续游戏</button>
+                    </div>
+                    <div id="rematchRequest" style="display: none;">
+                        <p style="margin-bottom: 10px;">对手请求继续游戏</p>
+                        <button onclick="acceptRematch()" type="button" class="btn btn-success" style="margin-right: 10px;">接受</button>
+                        <button onclick="rejectRematch()" type="button" class="btn btn-danger">拒绝</button>
+                    </div>
+                    <div id="point" style="display: none;">
+                        <label>请出牌</label>
+                    </div>
+                    <br>
+                    <br>
+                </div>
+
+                <div id="mySide" style="display: none;">
+                    <div class="col-md-24 column">
+                        <div class="card-side">
+                            <button id="my1" type="button" class="btn btn-default" onclick="sendCard(1)">1</button>
+                            <button id="my2" type="button" class="btn btn-default" onclick="sendCard(2)">2</button>
+                            <button id="my3" type="button" class="btn btn-default" onclick="sendCard(3)">3</button>
+                            <button id="my4" type="button" class="btn btn-default" onclick="sendCard(4)">4</button>
+                            <button id="my5" type="button" class="btn btn-default" onclick="sendCard(5)">5</button>
+                        </div>
+                    </div>
+                    <br>
+                    <div class="col-md-24 column">
+                        <div class="card-side">
+                            <button id="my6" type="button" class="btn btn-default" onclick="sendCard(6)">6</button>
+                            <button id="my7" type="button" class="btn btn-default" onclick="sendCard(7)">7</button>
+                            <button id="my8" type="button" class="btn btn-default" onclick="sendCard(8)">8</button>
+                            <button id="my9" type="button" class="btn btn-default" onclick="sendCard(9)">9</button>
+                            <button id="my10" type="button" class="btn btn-default" onclick="sendCard(10)">10</button>
+                        </div>
+                    </div>
+                    <br>
+                    <div class="player-name" id="myName">我</div>
+                    <div id="myWinRate"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音频资源 -->
+    <audio id="footstepSound" preload="auto">
+        <source src="audio/footstep.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="sendCardSound" preload="auto">
+        <source src="audio/sendCard.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="startSound" preload="auto">
+        <source src="audio/start.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="clickSound" preload="auto">
+        <source src="audio/click.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="victorySound" preload="auto">
+        <source src="audio/victory.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="defeatSound" preload="auto">
+        <source src="audio/defeat.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // WebSocket连接管理
+        let gameSocket = null;
+        let roomSocket = null;
+        const deviceId = localStorage.getItem("deviceId") || generateDeviceId();
+
+        // 页面切换函数
+        function showPage(pageId) {
+            $('.page').removeClass('active');
+            $(`#${pageId}`).addClass('active');
+        }
+
+        // 初始化WebSocket连接
+        function initWebSockets() {
+            // 连接房间WebSocket
+            try {
+                roomSocket = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
+                console.log('Attempting to connect to room WebSocket...');
+                
+                roomSocket.onopen = () => {
+                    console.log('Room WebSocket connected successfully');
+                };
+                
+                roomSocket.onerror = (error) => {
+                    console.error('Room WebSocket error:', error);
+                    alert('连接服务器失败，请刷新页面重试');
+                };
+                
+                roomSocket.onclose = () => {
+                    console.log('Room WebSocket connection closed');
+                };
+                
+                roomSocket.onmessage = (event) => {
+                    console.log('Received message from room:', event.data);
+                    handleRoomMessage(event);
+                };
+            } catch (error) {
+                console.error('Error creating room WebSocket:', error);
+            }
+        }
+
+        // 在script标签中添加消息处理函数
+        function handleRoomMessage(event) {
+            console.log('Room message received:', event.data);
+            try {
+                const data = JSON.parse(event.data);
+                
+                // 处理房间已满的情况
+                if (data.type === 'room_full') {
+                    alert('房间已满！');
+                    return;
+                }
+                
+                // 处理正常的房间加入消息
+                if (Array.isArray(data)) {
+                    showPage('gamePage');
+                    
+                    // 找到自己和对手的数据
+                    const myData = data.find(user => user.deviceId === deviceId);
+                    const opponentData = data.find(user => user.deviceId !== deviceId);
+                    
+                    // 更新自己的信息
+                    if (myData) {
+                        $('#mySide').show();
+                        $('#myName').text('我: ' + myData.nickName);
+                        $('#myWinRate').text('胜率: ' + myData.winRate + '%');
+                        
+                        // 无论是红方还是蓝方，都连接游戏WebSocket
+                        connectGameSocket();
+                    }
+                    
+                    // 如果只有一个玩家（自己）
+                    if (data.length === 1) {
+                        $('#waitAnotherPlayer').show();
+                    }
+                    // 如果有两个玩家
+                    else if (data.length === 2 && opponentData) {
+                        $('#waitAnotherPlayer').hide();
+                        $('#opponentSide').show();
+                        $('#opponentName').text('对手: ' + opponentData.nickName);
+                        $('#opponentWinRate').text('胜率: ' + opponentData.winRate + '%');
+                        
+                        // 显示游戏开始动画
+                        showGameStart();
+                    }
+                }
+            } catch (error) {
+                console.error('Error handling room message:', error);
+            }
+        }
+
+        function handleGameMessage(event) {
+            console.log('Game message received:', event.data);
+            try {
+                const message = event.data;
+                
+                switch (message) {
+                    case '100': // 红方胜出
+                        handleGameResult(true);
+                        break;
+                    case '200': // 蓝方胜出
+                        handleGameResult(false);
+                        break;
+                    case '300': // 请出牌
+                        $('#point').show();
+                        playFootstepSound();
+                        enableRemainingCards();
+                        break;
+                    case '600': // 平局
+                        handleDraw();
+                        break;
+                    default:
+                        // 处理对手出牌消息
+                        if (!isNaN(message)) {
+                            const card = parseInt(message);
+                            if (card >= 1 && card <= 10) {
+                                $(`#opp${card}`).addClass('flip');
+                                playCardSound();
+                            }
+                        }
+                }
+            } catch (error) {
+                console.error('Error handling game message:', error);
+            }
+        }
+
+        function connectGameSocket() {
+            if (!gameSocket || gameSocket.readyState !== WebSocket.OPEN) {
+                gameSocket = new WebSocket(`ws://localhost:4396/game?deviceId=${deviceId}`);
+                
+                gameSocket.onopen = () => {
+                    console.log('Game WebSocket connected');
+                };
+                
+                gameSocket.onclose = () => {
+                    console.log('Game WebSocket closed, attempting to reconnect...');
+                    setTimeout(connectGameSocket, 1000); // 1秒后重试
+                };
+                
+                gameSocket.onerror = (error) => {
+                    console.error('Game WebSocket error:', error);
+                };
+                
+                gameSocket.onmessage = (event) => {
+                    console.log('Game message received:', event.data);
+                    handleGameMessage(event);
+                };
+            }
+        }
+
+        function showGameStart() {
+            $('#startOverlay').addClass('show');
+            playStartSound();
+            setTimeout(() => {
+                $('#startOverlay').removeClass('show');
+            }, 2000);
+        }
+
+        // 其他辅助函数
+        function handleGameResult(isWin) {
+            $('#resultText').text(isWin ? '胜利！' : '失败！');
+            $('#resultOverlay').addClass('show');
+            playSound(isWin ? 'victorySound' : 'defeatSound');
+        }
+
+        function handleDraw() {
+            $('#resultText').text('平局！');
+            $('#resultOverlay').addClass('show');
+        }
+
+        function handleCardPlay(card) {
+            $(`#opp${card}`).addClass('flip');
+            playCardSound();
+        }
+
+        function playStartSound() {
+            const sound = document.getElementById('startSound');
+            sound.volume = 0.5;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        function playCardSound() {
+            const sound = document.getElementById('sendCardSound');
+            sound.volume = 0.5;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        function playFootstepSound() {
+            const sound = document.getElementById('footstepSound');
+            sound.volume = 0.5;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        function initializeGamePage() {
+            // 隐藏所有游戏相关元素
+            $('#opponentSide').hide();
+            $('#mySide').hide();
+            $('#waitAnotherPlayer').hide();
+            $('#answer').hide();
+            $('#rematchRequest').hide();
+            $('#point').hide();
+            $('#resultOverlay').removeClass('show');
+            
+            // 重置所有卡牌状态
+            $('.card-side button').removeClass('flip');
+            $('.card-side button').prop('disabled', false);
+        }
+
+        $(document).ready(function() {
+            initializeGamePage();
+            initWebSockets();
+            
+            $('#joinBtn').click(function() {
+                let roomCode = $('#roomCodeInput').val().trim();
+                if (!roomCode) {
+                    alert("请输入房间号！");
+                    return;
+                }
+                
+                if (!roomSocket || roomSocket.readyState !== WebSocket.OPEN) {
+                    console.error('WebSocket not connected. State:', roomSocket ? roomSocket.readyState : 'null');
+                    alert("正在连接服务器，请稍后重试...");
+                    initWebSockets();
+                    return;
+                }
+                
+                console.log('Sending join request for room:', roomCode);
+                
+                let playerData = {
+                    deviceId: deviceId,
+                    roomCode: roomCode,
+                    userCode: '',
+                    nickName: getNickname()
+                };
+                
+                try {
+                    roomSocket.send(JSON.stringify(playerData));
+                    console.log('Join request sent successfully');
+                    playClickSound();
+                    $('#loadingMessage').show();
+                    $('#joinBtn').prop('disabled', true);
+                } catch (error) {
+                    console.error('Error sending join request:', error);
+                    alert('发送请求失败，请重试');
+                    $('#loadingMessage').hide();
+                    $('#joinBtn').prop('disabled', false);
+                }
+            });
+        });
+
+        // 播放音效函数
+        function playClickSound() {
+            const sound = document.getElementById('clickSound');
+            sound.volume = 0.5;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        // 获取昵称
+        function getNickname() {
+            let nickname = localStorage.getItem("nickname");
+            if (!nickname) {
+                nickname = prompt("请输入您的昵称：");
+                if (nickname) {
+                    localStorage.setItem("nickname", nickname);
+                } else {
+                    nickname = "匿名玩家";
+                }
+            }
+            return nickname;
+        }
+
+        // 添加出牌相关函数
+        function sendCard(card) {
+            if (!gameSocket || gameSocket.readyState !== WebSocket.OPEN) {
+                console.error('Game WebSocket not connected, attempting to reconnect...');
+                connectGameSocket();
+                // 保存当前要出的牌，等连接成功后再发送
+                setTimeout(() => {
+                    if (gameSocket && gameSocket.readyState === WebSocket.OPEN) {
+                        sendCard(card);
+                    } else {
+                        alert('连接服务器失败，请刷新页面重试');
+                        enableRemainingCards();
+                    }
+                }, 1000);
+                return;
+            }
+
+            try {
+                // 播放出牌音效
+                playCardSound();
+                
+                // 禁用所有牌
+                disableAllCards();
+                
+                // 隐藏出牌提示
+                $('#point').hide();
+                
+                // 添加翻牌动画
+                $(`#my${card}`).addClass('flip');
+                
+                // 发送出牌消息
+                const message = {
+                    deviceId: deviceId,
+                    card: card
+                };
+                gameSocket.send(JSON.stringify(message));
+                
+            } catch (error) {
+                console.error('Error sending card:', error);
+                enableRemainingCards(); // 出错时重新启用牌
+            }
+        }
+
+        // 禁用所有牌
+        function disableAllCards() {
+            for (let i = 1; i <= 10; i++) {
+                $(`#my${i}`).prop('disabled', true);
+            }
+        }
+
+        // 启用剩余的牌
+        function enableRemainingCards() {
+            for (let i = 1; i <= 10; i++) {
+                const card = $(`#my${i}`);
+                if (!card.hasClass('flip')) {
+                    card.prop('disabled', false);
+                }
+            }
+        }
+
+        // 重置游戏状态
+        function resetGameState() {
+            // 移除所有翻牌动画
+            $('.card-side button').removeClass('flip');
+            // 启用所有牌
+            $('.card-side button').prop('disabled', false);
+            // 隐藏结果弹窗
+            $('#resultOverlay').removeClass('show');
+            // 隐藏出牌提示
+            $('#point').hide();
+        }
+    </script>
+
+    <!-- 修改结果弹窗 -->
+    <div class="overlay" id="resultOverlay" style="display: none;">
+        <div class="result-box" id="resultBox">
+            <h2 id="resultText"></h2>
+            <div class="button-group">
+                <button onclick="goHome()" type="button" class="btn btn-primary">主页</button>
+                <button onclick="requestRematch()" type="button" class="btn btn-success">继续游戏</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="start-overlay" id="startOverlay">
+        <div class="start-text">游戏开始！</div>
+    </div>
+</body>
+</html> 

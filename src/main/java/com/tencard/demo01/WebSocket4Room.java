@@ -33,7 +33,7 @@ public class WebSocket4Room {
 
 
     // 设备id与会话的映射 更新保持最新
-    public static Map<String,Session> deviceId2SessionMap_Room = new ConcurrentHashMap<>();
+    public static Map<String, Session> deviceId2SessionMap_Room = new ConcurrentHashMap<>();
     // deviceId -> roomId 映射
     public static Map<String,Long> deviceId2RoomIdMap = new ConcurrentHashMap<>();
 
@@ -47,8 +47,15 @@ public class WebSocket4Room {
         String deviceId = session.getRequestParameterMap().get("deviceId").get(0);
 
         if (deviceId != null) {
-            // 将 deviceId 与 session 映射存储
-            deviceId2SessionMap_Room.put(deviceId, session);
+            // 更新session映射，处理可能的重复连接
+            Session oldSession = deviceId2SessionMap_Room.put(deviceId, session);
+            if (oldSession != null && !oldSession.equals(session)) {
+                try {
+                    oldSession.close();
+                } catch (IOException e) {
+                    log.error("Error closing old session", e);
+                }
+            }
             log.info("/room - Device ID: {} connected with session ID: {}", deviceId, session.getId());
         } else {
             log.warn("/room - No deviceId found in the connection request");
@@ -80,24 +87,52 @@ public class WebSocket4Room {
     }
 
     @OnMessage
-    public void onMessage(String message, Session session) throws IOException {
-        log.info("/room - message内容为：{} ", message);
-        User user = JSON.parseObject(message, User.class);
+    public void onMessage(String message, Session session) {
+        log.info("/room - Received message: {}", message);
         
-        // 处理继续游戏相关的消息
-        if (user.type != null) {
-            handleRematch(user);
-            return;
+        try {
+            User user = JSON.parseObject(message, User.class);
+            log.info("/room - Parsed user data: {}", user);
+            
+            if (user.deviceId == null || user.roomCode == null) {
+                log.error("/room - Invalid message: deviceId or roomCode is null");
+                return;
+            }
+            
+            // 处理加入房间
+            handleJoinRoom(user, session);
+            
+        } catch (Exception e) {
+            log.error("/room - Error processing message: ", e);
         }
+    }
 
-        // 原有的房间匹配逻辑保持不变
-        if (user.deviceId == null || user.roomCode == null) return;
-//        user.setNickName("xiaohua");
+    private void handleRematchRequest(User user) {
+        // 通知对手重新匹配请求
+        notifyOpponent(user, "rematch_request");
+    }
+
+    private void handleRematchResponse(User user) {
+        if ("rematch_accept".equals(user.type)) {
+            // 重置游戏状态
+            Long roomId = deviceId2RoomIdMap.get(user.deviceId);
+            if (roomId != null) {
+                WebSocket4Game.resetGameState(roomId);
+            }
+        }
+        // 通知发起方响应结果
+        notifyOpponent(user, user.type);
+    }
+
+    private void handleJoinRoom(User user, Session session) {
+        log.info("/room - Processing join room request for room: {}", user.roomCode);
+        
         user.setWinRate(49);
         user.setSession(session);
         user.setSessionId(session.getId());
-        log.info("/room ======== user为：{} =========== ", user);
-        if (roomCode2RoomIdMap.containsKey(user.roomCode)) { // 已经创建过房间
+        
+        if (roomCode2RoomIdMap.containsKey(user.roomCode)) {
+            log.info("/room - Found existing room with code: {}", user.roomCode);
             Long roomId = roomCode2RoomIdMap.get(user.roomCode);
             List<User> existingUsers = roomId2UserListMap.get(roomId);
             
@@ -130,6 +165,7 @@ public class WebSocket4Room {
                 sendMessage(e.session, updatedUsers);
             });
         } else {
+            log.info("/room - Creating new room with code: {}", user.roomCode);
             // 新建一个房间Id 蓝色方
             user.setRole(GameUtil.RoleEnum.blueSide.toString());
             user.setMsgCode(GameUtil.BlUE_JOIN_GAME); // 50
@@ -154,65 +190,47 @@ public class WebSocket4Room {
         }
     }
 
-    private void handleRematch(User user) {
-        try {
-            // 获取当前房间ID
-            Long roomId = deviceId2RoomIdMap.get(user.deviceId);
-            if (roomId == null) {
-                log.warn("/room - Cannot find roomId for deviceId: {}", user.deviceId);
-                return;
-            }
+    private void notifyOpponent(User user, String type) {
+        // 获取对手的User对象
+        User opponent = roomId2UserListMap.get(deviceId2RoomIdMap.get(user.deviceId)).stream()
+                .filter(u -> !u.deviceId.equals(user.deviceId))
+                .findFirst()
+                .orElse(null);
 
-            // 获取房间内的玩家列表
-            List<User> users = roomId2UserListMap.get(roomId);
-            if (users == null || users.size() != 2) {
-                log.warn("/room - Invalid user count in room: {}", roomId);
-                return;
-            }
+        if (opponent == null) {
+            log.warn("/room - Cannot find opponent for user: {}", user.deviceId);
+            return;
+        }
 
-            // 获取对手的User对象
-            User opponent = users.stream()
-                    .filter(u -> !u.deviceId.equals(user.deviceId))
-                    .findFirst()
-                    .orElse(null);
+        Session opponentSession = deviceId2SessionMap_Room.get(opponent.deviceId);
+        Session currentSession = deviceId2SessionMap_Room.get(user.deviceId);
 
-            if (opponent == null) {
-                log.warn("/room - Cannot find opponent for user: {}", user.deviceId);
-                return;
-            }
+        switch (type) {
+            case "rematch_request":
+                // 转发继续游戏请求给对手
+                if (opponentSession != null && opponentSession.isOpen()) {
+                    GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
+                }
+                break;
 
-            Session opponentSession = deviceId2SessionMap_Room.get(opponent.deviceId);
-            Session currentSession = deviceId2SessionMap_Room.get(user.deviceId);
+            case "rematch_accept":
+                // 通知双方重置游戏状态
+                if (currentSession != null && currentSession.isOpen()) {
+                    GameUtil.sendMessage(currentSession, JSON.toJSONString(user));
+                }
+                if (opponentSession != null && opponentSession.isOpen()) {
+                    GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
+                }
+                // 重置游戏状态
+                WebSocket4Game.resetGameState(deviceId2RoomIdMap.get(user.deviceId));
+                break;
 
-            switch (user.type) {
-                case "rematch_request":
-                    // 转发继续游戏请求给对手
-                    if (opponentSession != null && opponentSession.isOpen()) {
-                        GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
-                    }
-                    break;
-
-                case "rematch_accept":
-                    // 通知双方重置游戏状态
-                    if (currentSession != null && currentSession.isOpen()) {
-                        GameUtil.sendMessage(currentSession, JSON.toJSONString(user));
-                    }
-                    if (opponentSession != null && opponentSession.isOpen()) {
-                        GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
-                    }
-                    // 重置游戏状态
-                    WebSocket4Game.resetGameState(roomId);
-                    break;
-
-                case "rematch_reject":
-                    // 通知请求方对方拒绝
-                    if (opponentSession != null && opponentSession.isOpen()) {
-                        GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
-                    }
-                    break;
-            }
-        } catch (Exception e) {
-            log.error("/room - Error handling rematch: {}", e.getMessage(), e);
+            case "rematch_reject":
+                // 通知请求方对方拒绝
+                if (opponentSession != null && opponentSession.isOpen()) {
+                    GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
+                }
+                break;
         }
     }
 

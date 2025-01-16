@@ -1,48 +1,252 @@
-/* 游戏容器 */
-#gameContainer {
+/* 基础样式 */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f9;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    padding: 10px;
-    box-sizing: border-box;
+    min-height: 100vh;
 }
 
-/* 玩家容器 */
-.player-container {
-    margin: 20px;
+/* 页面切换控制 */
+.page {
+    display: none;
+}
+.page.active {
+    display: block;
+}
+
+/* 房间页面样式 */
+.game-container {
     text-align: center;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    width: 90%;
+    max-width: 400px;
+    margin: 20px auto;
 }
 
-/* 玩家名称 */
-.player-name {
-    font-size: 20px;
-    font-weight: bold;
-    margin-bottom: 10px;
+.game-container h1 {
+    margin-bottom: 20px;
+    color: #333;
 }
 
-/* 玩家牌 */
-.player-cards {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-}
-
-/* 玩家牌样式 */
-.card {
-    width: 50px;
-    height: 70px;
-    background-color: lightblue;
+.input-container {
     display: flex;
     justify-content: center;
     align-items: center;
+    margin-bottom: 20px;
+}
+
+.input-container input {
+    width: 60%;
+    padding: 10px;
     font-size: 16px;
     border-radius: 5px;
-    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+    border: 1px solid #ccc;
 }
 
-/* 按钮 */
-#controlButtons {
-    margin-top: 20px;
+.input-container button {
+    padding: 10px 20px;
+    font-size: 16px;
+    border: none;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.input-container button:hover {
+    background-color: #45a049;
+}
+
+.status-message {
+    color: #333;
+    font-size: 18px;
+    margin-bottom: 20px;
+}
+
+/* 房间已满提示层样式 */
+.room-full-tip {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 8px;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-out;
+}
+
+.room-full-tip.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 游戏页面样式 */
+.container-fluid {
+    padding-top: 8vh;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.card-side {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 8px 0;
+}
+
+.card-side button {
+    min-width: 45px;
+    min-height: 45px;
+    font-size: 18px;
+    padding: 10px;
+    border-radius: 8px;
+    transition: all 0.3s ease-out;
+    position: relative;
+    transform-origin: center center;
+    background: white;
+    border: 1px solid #ccc;
+}
+
+.player-name {
+    font-size: 15px;
+    margin: 10px 0;
+}
+
+/* 游戏开始提示层样式 */
+.start-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 15px 30px;
+    border-radius: 8px;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease-out;
+}
+
+.start-text {
+    color: white;
+    font-size: 24px;
+    font-weight: normal;
+    text-align: center;
+    margin: 0;
+}
+
+.start-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 出牌动画 */
+.card-side button.flip {
+    animation: throwCard 1.8s cubic-bezier(0.23, 1, 0.32, 1);
+    background-color: grey !important;
+}
+
+@keyframes throwCard {
+    0% {
+        transform: scale(1) translate(0, 0);
+        opacity: 1;
+    }
+    30% {
+        transform: scale(1.2) translate(0, -20px);
+        opacity: 1;
+        box-shadow: 0 15px 15px rgba(0,0,0,0.2);
+    }
+    50% {
+        transform: scale(1.1) translate(var(--throw-x), var(--throw-y));
+        opacity: 1;
+        box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+    }
+    80% {
+        transform: scale(1.1) translate(var(--throw-x), var(--throw-y));
+        opacity: 1;
+        box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+    }
+    100% {
+        transform: scale(0.9) translate(var(--throw-x), var(--throw-y));
+        opacity: 0;
+    }
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 480px) {
+    .container-fluid {
+        padding-top: 8vh;
+    }
+
+    .card-side {
+        gap: 12px;
+    }
+
+    .card-side button {
+        min-width: 40px;
+        min-height: 40px;
+        font-size: 16px;
+        padding: 8px;
+    }
+}
+
+/* 按钮样式统一 */
+.btn-primary {
+    background-color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.btn-primary:hover {
+    background-color: #45a049;
+    border-color: #45a049;
+}
+
+/* 游戏页面初始隐藏相关元素 */
+#answer, #rematchRequest, #point, #waitAnotherPlayer, #opponentSide, #mySide {
+    display: none;
+}
+
+/* 当需要显示时使用 */
+.show {
+    display: block !important;
+}
+
+/* 确保游戏页面在激活时占满屏幕 */
+#gamePage.active {
+    width: 100%;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: #f4f4f9;
+}
+
+/* 结果弹窗样式 */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: none;  /* 默认隐藏 */
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.overlay.show {
+    display: flex;  /* 显示时使用flex布局 */
 }

@@ -9,6 +9,7 @@ import javax.websocket.OnMessage;
 import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -27,7 +28,7 @@ public class WebSocket4Game {
     public static Map<Long,GameState> roomStataMap = new ConcurrentHashMap<>(); // 游戏状态 key为roomId
 
     // 设备id与会话的映射 更新保持最新
-    public static Map<String,Session> deviceId2SessionMap_Game = new ConcurrentHashMap<>();
+    public static Map<String, Session> deviceId2SessionMap_Game = new ConcurrentHashMap<>();
 
     @OnOpen
     public void onOpen(Session session) {
@@ -35,8 +36,15 @@ public class WebSocket4Game {
         String deviceId = session.getRequestParameterMap().get("deviceId").get(0);
 
         if (deviceId != null) {
-            // 将 deviceId 与 session 映射存储
-            deviceId2SessionMap_Game.put(deviceId, session);
+            // 更新session映射
+            Session oldSession = deviceId2SessionMap_Game.put(deviceId, session);
+            if (oldSession != null && !oldSession.equals(session)) {
+                try {
+                    oldSession.close();
+                } catch (IOException e) {
+                    log.error("Error closing old session", e);
+                }
+            }
             log.info("/game - Device ID: {} connected with session ID: {}", deviceId, session.getId());
         } else {
             log.warn("/game - No deviceId found in the connection request");
@@ -45,15 +53,14 @@ public class WebSocket4Game {
 
     @OnClose
     public void onClose(Session session) {
-        log.info("/game xxxxxxxxxxx   要清掉一个session数据辣 sessionId: {}  xxxxxxxxxxx ",session.getId());
-        // 查找对应的 deviceId
         String deviceId = findDeviceIdBySession(session);
         if (deviceId != null) {
-            // 移除 session
-            deviceId2SessionMap_Game.remove(deviceId);
-            log.info("/game -Device ID: {} disconnected. Removed from deviceId2SessionMap", deviceId);
-        } else {
-            log.warn("/game - Session closed, but deviceId not found. Could not remove from deviceId2SessionMap");
+            // 只有当当前session是最新的session时才移除
+            Session currentSession = deviceId2SessionMap_Game.get(deviceId);
+            if (session.equals(currentSession)) {
+                deviceId2SessionMap_Game.remove(deviceId);
+                log.info("/game - Device ID: {} disconnected", deviceId);
+            }
         }
     }
 
@@ -69,39 +76,38 @@ public class WebSocket4Game {
 
     @OnMessage
     public void onMessage(String message, Session session) {
-        // 将消息转为 User 对象
         User user = JSON.parseObject(message, User.class);
-
+        
         // 如果设备ID或卡牌为空，则直接返回
         if (user.deviceId == null || user.card == null) return;
-
+        
         // 获取对应房间ID
         Long roomId = deviceId2RoomIdMap.get(user.deviceId);
         if (roomId == null) return;
-
+        
         // 获取或创建游戏状态
         GameState gameState = roomStataMap.computeIfAbsent(roomId, k -> new GameState());
+        
+        // 处理游戏逻辑
+        handleGameLogic(user, gameState, roomId, session);
+    }
 
-        // 获取当前回合数 m 和对方的出牌
+    private void handleGameLogic(User user, GameState gameState, Long roomId, Session session) {
         Integer m = gameState.m;
         Integer otherCard = gameState.otherCard;
-
+        
         Integer card = user.card;
         log.error("/game - m的值为： ".concat(String.valueOf(m)));
-        m++;  // 增加回合数 m
+        m++;  // 增加回合数
         gameState.m = m;
 
-        log.info("/game - 出牌消息:{}", message);
-
         if (m % 2 == 0) {  // 双方都出牌了
-            Integer finalOtherCard = otherCard;
-
             // 向房间内的所有玩家发送消息
             roomId2UserListMap.get(roomId).forEach(e -> {
                 Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
                 if (playerSession != null) {
                     sendMessage(playerSession, card.toString());
-                    sendMessage(playerSession, finalOtherCard.toString());
+                    sendMessage(playerSession, otherCard.toString());
                 }
             });
 
@@ -119,6 +125,7 @@ public class WebSocket4Game {
             // 判断胜负
             if (!(redcard == 1 || bluecard == 11)) {
                 if (redcard / (bluecard - TEN) >= 2) {
+                    // 红方胜
                     roomId2UserListMap.get(roomId).forEach(e -> {
                         Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
                         if (playerSession != null) {
@@ -126,6 +133,7 @@ public class WebSocket4Game {
                         }
                     });
                 } else if ((bluecard - 10) / redcard >= 2) {
+                    // 蓝方胜
                     roomId2UserListMap.get(roomId).forEach(e -> {
                         Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
                         if (playerSession != null) {

@@ -108,8 +108,8 @@
 <script>
 
     let deviceId = localStorage.getItem("deviceId") || generateDeviceId(); // 获取生成的设备Id
-//    let websocket = new WebSocket(`ws://118.31.102.119:4396/room?deviceId=${deviceId}`);
-    let websocket = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
+    let websocket = new WebSocket(`ws://118.31.102.119:4396/room?deviceId=${deviceId}`);
+//    let websocket = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
 
     // 添加显示房间已满提示的函数
     function showRoomFullTip() {
