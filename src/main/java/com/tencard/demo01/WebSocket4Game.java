@@ -1,6 +1,7 @@
 package com.tencard.demo01;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -10,8 +11,10 @@ import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static com.tencard.demo01.GameUtil.*;
 import static com.tencard.demo01.WebSocket4Room.*;
@@ -29,6 +32,9 @@ public class WebSocket4Game {
 
     // 设备id与会话的映射 更新保持最新
     public static Map<String, Session> deviceId2SessionMap_Game = new ConcurrentHashMap<>();
+
+    // 存储游戏记录
+    private static Map<String, List<GameState>> playerGameRecords = new ConcurrentHashMap<>();
 
     @OnOpen
     public void onOpen(Session session) {
@@ -76,110 +82,104 @@ public class WebSocket4Game {
 
     @OnMessage
     public void onMessage(String message, Session session) {
-        User user = JSON.parseObject(message, User.class);
+        log.info("/game - 收到消息：{}", message);
         
-        // 如果设备ID或卡牌为空，则直接返回
-        if (user.deviceId == null || user.card == null) return;
-        
-        // 获取对应房间ID
-        Long roomId = deviceId2RoomIdMap.get(user.deviceId);
-        if (roomId == null) return;
-        
-        // 获取或创建游戏状态
-        GameState gameState = roomStataMap.computeIfAbsent(roomId, k -> new GameState());
-        
-        // 处理游戏逻辑
-        handleGameLogic(user, gameState, roomId, session);
-    }
+        try {
+            UserVO userVO = JSON.parseObject(message, UserVO.class);
+            if (userVO.deviceId == null || userVO.card == null) return;
 
-    private void handleGameLogic(User user, GameState gameState, Long roomId, Session session) {
-        Integer m = gameState.m;
-        Integer otherCard = gameState.otherCard;
-        
-        Integer card = user.card;
-        log.error("/game - m的值为： ".concat(String.valueOf(m)));
-        m++;  // 增加回合数
-        gameState.m = m;
+            Long roomId = deviceId2RoomIdMap.get(userVO.deviceId);
+            if (roomId == null) return;
 
-        if (m % 2 == 0) {  // 双方都出牌了
-            // 向房间内的所有玩家发送消息
-            roomId2UserListMap.get(roomId).forEach(e -> {
-                Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
-                if (playerSession != null) {
-                    sendMessage(playerSession, card.toString());
-                    sendMessage(playerSession, otherCard.toString());
-                }
-            });
-
-            // 红色方上点数1-10 蓝色方在下 点数11-20
-            int redcard = card;  // 红方卡牌
-            int bluecard = otherCard;  // 蓝方卡牌
-
-            // 保证 redcard 小于 bluecard
-            if (redcard > bluecard) {
-                int temp = redcard;
-                redcard = bluecard;
-                bluecard = temp;
+            GameState gameState = roomStataMap.computeIfAbsent(roomId, k -> new GameState());
+            
+            // 如果游戏已经结束，不再接受出牌
+            if (gameState.isGameCompleted()) {
+                return;
             }
 
-            // 判断胜负
-            if (!(redcard == 1 || bluecard == 11)) {
-                if (redcard / (bluecard - TEN) >= 2) {
-                    // 红方胜
-                    roomId2UserListMap.get(roomId).forEach(e -> {
-                        Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
-                        if (playerSession != null) {
-                            sendMessage(playerSession, RED_WIN);
+            gameState.addCard(userVO.role, userVO.card);
+
+            if (gameState.isCurrentRoundComplete()) {
+                // 发送回合完成消息
+                List<UserVO> players = roomId2UserListMap.get(roomId);
+                for (UserVO player : players) {
+                    Session playerSession = deviceId2SessionMap_Game.get(player.deviceId);
+                    if (playerSession != null) {
+                        JSONObject roundInfo = new JSONObject();
+                        roundInfo.put("type", GameState.MSG_TYPE_ROUND_COMPLETE);
+                        roundInfo.put("round", gameState.getRoundNumber());
+                        
+                        if ("redSide".equals(player.role)) {
+                            roundInfo.put("myCard", gameState.getCurrentRedCard());
+                            roundInfo.put("oppCard", gameState.getCurrentBlueCard());
+                        } else {
+                            roundInfo.put("myCard", gameState.getCurrentBlueCard());
+                            roundInfo.put("oppCard", gameState.getCurrentRedCard());
                         }
-                    });
-                } else if ((bluecard - 10) / redcard >= 2) {
-                    // 蓝方胜
-                    roomId2UserListMap.get(roomId).forEach(e -> {
-                        Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
-                        if (playerSession != null) {
-                            sendMessage(playerSession, BLUE_WIN);
+                        
+                        sendMessage(playerSession, roundInfo.toJSONString());
+                    }
+                }
+
+                // 判断回合结果
+                String result = gameState.determineRoundResult();
+                if (GameState.RESULT_CONTINUE.equals(result)) {
+                    gameState.nextRound();  // 进入下一回合
+                } else {
+                    // 记录游戏结果
+                    if (GameState.RESULT_RED_WIN.equals(result)) {
+                        UserVO redPlayer = players.stream()
+                                .filter(p -> "redSide".equals(p.role))
+                                .findFirst()
+                                .orElse(null);
+                        UserVO bluePlayer = players.stream()
+                                .filter(p -> "blueSide".equals(p.role))
+                                .findFirst()
+                                .orElse(null);
+                        if (redPlayer != null && bluePlayer != null) {
+                            recordGame(roomId, redPlayer.deviceId, bluePlayer.deviceId);
                         }
-                    });
-                } else if (gameState.m >= 20) {  // 如果已经是最后一轮
-                    // 判断点数大小
-                    if (redcard > (bluecard - TEN)) {
-                        roomId2UserListMap.get(roomId).forEach(e -> {
-                            Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
-                            if (playerSession != null) {
-                                sendMessage(playerSession, RED_WIN);
-                            }
-                        });
-                    } else if (redcard < (bluecard - TEN)) {
-                        roomId2UserListMap.get(roomId).forEach(e -> {
-                            Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
-                            if (playerSession != null) {
-                                sendMessage(playerSession, BLUE_WIN);
-                            }
-                        });
-                    } else {
-                        // 点数相等，平局
-                        roomId2UserListMap.get(roomId).forEach(e -> {
-                            Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
-                            if (playerSession != null) {
-                                sendMessage(playerSession, "600");  // WIN_WIN
-                            }
-                        });
+                    } else if (GameState.RESULT_BLUE_WIN.equals(result)) {
+                        UserVO redPlayer = players.stream()
+                                .filter(p -> "redSide".equals(p.role))
+                                .findFirst()
+                                .orElse(null);
+                        UserVO bluePlayer = players.stream()
+                                .filter(p -> "blueSide".equals(p.role))
+                                .findFirst()
+                                .orElse(null);
+                        if (redPlayer != null && bluePlayer != null) {
+                            recordGame(roomId, bluePlayer.deviceId, redPlayer.deviceId);
+                        }
+                    }
+                    // 平局不记录
+
+                    // 发送游戏结果消息
+                    JSONObject resultInfo = new JSONObject();
+                    resultInfo.put("type", GameState.MSG_TYPE_GAME_RESULT);
+                    resultInfo.put("result", result);
+                    broadcastToRoom(roomId, resultInfo.toJSONString());
+                }
+            } else {
+                // 只有一方出牌，通知对手出牌
+                List<UserVO> players = roomId2UserListMap.get(roomId);
+                UserVO opponent = players.stream()
+                        .filter(p -> !p.deviceId.equals(userVO.deviceId))
+                        .findFirst()
+                        .orElse(null);
+
+                if (opponent != null) {
+                    Session opponentSession = deviceId2SessionMap_Game.get(opponent.deviceId);
+                    if (opponentSession != null && opponentSession.isOpen()) {
+                        JSONObject takeTurnInfo = new JSONObject();
+                        takeTurnInfo.put("type", GameState.MSG_TYPE_PLEASE_TAKE_CARD);
+                        sendMessage(opponentSession, takeTurnInfo.toJSONString());
                     }
                 }
             }
-        } else {  // 第一次出牌
-            gameState.otherCard = card;
-            
-            // 提示对方出牌
-            roomId2UserListMap.get(roomId)
-                    .stream()
-                    .filter(e -> !e.deviceId.equals(user.deviceId))
-                    .forEach(e -> {
-                        Session playerSession = deviceId2SessionMap_Game.get(e.deviceId);
-                        if (playerSession != null) {
-                            sendMessage(playerSession, PLEASE_TAKE_CARD);
-                        }
-                    });
+        } catch (Exception e) {
+            log.error("/game - Error processing message: ", e);
         }
     }
 
@@ -209,4 +209,90 @@ public class WebSocket4Game {
             gameState.reset();
         }
     }
+
+    private void broadcastToRoom(Long roomId, String message) {
+        List<UserVO> players = roomId2UserListMap.get(roomId);
+        if (players != null) {
+            for (UserVO player : players) {
+                Session playerSession = deviceId2SessionMap_Game.get(player.deviceId);
+                if (playerSession != null && playerSession.isOpen()) {
+                    sendMessage(playerSession, message);
+                }
+            }
+        }
+    }
+
+    // 记录游戏结果
+    private void recordGame(Long roomId, String winner, String loser) {
+        GameState currentGame = roomStataMap.get(roomId);
+        currentGame.recordGameResult(winner, loser);
+        currentGame.setRoomId(roomId);  // 确保设置roomId
+        
+        // 为双方玩家创建游戏记录
+        GameState gameRecord = currentGame.createRecord();
+        
+        // 为双方添加记录
+        playerGameRecords.computeIfAbsent(winner, k -> new CopyOnWriteArrayList<>()).add(gameRecord);
+        playerGameRecords.computeIfAbsent(loser, k -> new CopyOnWriteArrayList<>()).add(gameRecord);
+        
+        // 计算胜利者的连胜次数
+        long winStreak = calculateWinStreak(winner, roomId);
+        
+        // 如果连胜达到3次或以上，生成分享信息
+        if (winStreak >= 3) {
+            JSONObject shareMessage = new JSONObject();
+            shareMessage.put("type", "share");
+
+            // 获取玩家昵称
+            String winnerName = roomId2UserListMap.get(roomId).stream()
+                    .filter(p -> p.deviceId.equals(winner))
+                    .map(p -> p.nickName)
+                    .findFirst()
+                    .orElse("玩家");
+            
+            String loserName = roomId2UserListMap.get(roomId).stream()
+                    .filter(p -> p.deviceId.equals(loser))
+                    .map(p -> p.nickName)
+                    .findFirst()
+                    .orElse("对手");
+
+            // 根据不同情况设置不同的分享内容
+            String shareCode = winStreak >= 5 ? "WIN5" : "WIN3";
+            shareMessage.put("shareCode", shareCode);  // 添加shareCode用于前端判断
+            shareMessage.put("winnerName", winnerName);  // 添加胜利者昵称
+            shareMessage.put("loserName", loserName);    // 添加失败者昵称
+
+            switch (shareCode) {
+                case "WIN3":
+                    shareMessage.put("title", "连战连捷！");
+                    shareMessage.put("content", String.format("%s：恭喜你喜得义子——%s！", winnerName, loserName));
+                    break;
+                case "WIN5":
+                    shareMessage.put("title", "超神！");
+                    shareMessage.put("content", String.format("%s5连胜！%s还不拜见义父？", winnerName, loserName));
+                    break;
+            }
+
+            // 发送分享消息
+            Session winnerSession = deviceId2SessionMap_Game.get(winner);
+            if (winnerSession != null && winnerSession.isOpen()) {
+                sendMessage(winnerSession, shareMessage.toJSONString());
+            }
+        }
+    }
+
+    // 计算指定玩家在当前房间的连胜次数
+    private long calculateWinStreak(String playerId, Long roomId) {
+        List<GameState> records = playerGameRecords.get(playerId);
+        if (records == null) return 0;
+
+        // 使用Stream API计算连胜
+        return records.stream()
+                .sorted((a, b) -> b.getGameEndTime().compareTo(a.getGameEndTime()))  // 按时间倒序
+                .takeWhile(record -> 
+                    record.getRoomId().equals(roomId) &&  // 同一房间
+                    record.getWinner().equals(playerId))  // 是胜利者
+                .count();
+    }
 }
+

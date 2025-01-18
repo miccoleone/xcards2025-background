@@ -180,7 +180,7 @@ body {
     }
     100% {
         transform: scale(0.9) translate(var(--throw-x), var(--throw-y));
-        opacity: 0;
+        opacity: var(--final-opacity, 1);
     }
 }
 
@@ -233,20 +233,344 @@ body {
     background-color: #f4f4f9;
 }
 
-/* 结果弹窗样式 */
-.overlay {
+/* 删除旧的 .overlay 相关样式 */
+.overlay,
+.overlay.show,
+.result-box,
+.result-box h2,
+.button-container,
+.result-btn,
+.result-btn:hover,
+.result-btn:active {
+    display: none;  /* 完全隐藏旧样式 */
+}
+
+/* 游戏结果弹窗 - 新样式 */
+.game-result-modal {
+    display: none;
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-    display: none;  /* 默认隐藏 */
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
-.overlay.show {
-    display: flex;  /* 显示时使用flex布局 */
+.game-result-modal.visible {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 1;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px 45px;
+    border-radius: 15px;
+    text-align: center;
+    min-width: 260px;
+    max-width: 80%;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    transform: scale(0.8);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.game-result-modal.visible .modal-content {
+    transform: scale(1);
+    opacity: 1;
+}
+
+.modal-content h2 {
+    margin: 0 0 25px 0;
+    font-size: 28px;
+    color: #333;
+    font-weight: bold;
+}
+
+.confirm-btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 12px 40px;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+}
+
+.confirm-btn:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
+}
+
+.confirm-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+/* 游戏选项按钮样式 */
+.game-options {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    align-items: center;
+    padding: 15px 25px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
+    z-index: 10;
+}
+
+.game-options button {
+    padding: 12px 35px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    min-width: 120px;
+    background: #4CAF50;
+    color: white;
+}
+
+.game-options button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: #45a049;
+}
+
+.game-options button:active {
+    transform: translateY(1px);
+}
+
+/* 对手（上方）已使用的牌样式 */
+#opponentSide .card-side button.flip {
+    background-color: #a0a0a0 !important;
+    color: #ffffff !important;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* 自己（下方）已使用的牌样式 */
+#mySide .card-side button.flip {
+    background-color: #a0a0a0 !important;
+    color: #ffffff !important;
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+/* 为上下方的牌设置不同的最终透明度 */
+#opponentSide .card-side button.flip {
+    --final-opacity: 0.6;
+}
+
+#mySide .card-side button.flip {
+    --final-opacity: 0.9;
+}
+
+/* 游戏完成状态下的牌样式 */
+#mySide.game-completed .card-side button {
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+}
+
+.card-side button.disabled {
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+}
+
+/* Home图标样式 */
+.home-icon {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    background: #4CAF50;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+    z-index: 100;
+}
+
+.home-icon:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    background: #45a049;
+}
+
+.home-icon:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.home-icon svg {
+    color: white;
+    width: 24px;
+    height: 24px;
+}
+
+/* 确保home图标在游戏页面时才显示 */
+#gamePage:not(.active) .home-icon {
+    display: none;
+}
+
+/* 修改centerSide的样式 */
+#centerSide {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    height: 30vh;
+    margin: 20px 0;
+    position: relative;
+}
+
+/* 等待提示和其他centerSide中的元素样式 */
+#waitAnotherPlayer, #rematchRequest, #point {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    padding: 15px 30px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    white-space: nowrap;
+    z-index: 10;
+}
+
+/* 为所有centerSide中的元素添加过渡效果 */
+#centerSide > * {
+    transition: all 0.3s ease-out;
+}
+
+.share-icon {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.share-icon.visible {
+    opacity: 1;
+}
+
+/* 更新分享内容样式 */
+.share-content {
+    width: 360px;
+    padding: 15px;
+    background: #2c2c2c;
+    color: white;
+    border-radius: 8px;
+    text-align: left;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    position: absolute;
+    left: -9999px;
+}
+
+.share-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.game-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.share-header span {
+    font-size: 16px;
+    font-weight: 300;  /* 细体 */
+    font-family: "Hiragino Sans GB", "Microsoft YaHei", sans-serif;  /* 圆体 */
+    color: rgba(255,255,255,0.9);
+}
+
+.share-image {
+    position: relative;
+    margin-bottom: 0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.main-img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.share-result {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px;
+    background: rgba(255, 87, 34, 0.9);  /* 红色半透明背景 */
+    color: white;
+    font-size: 15px;
+    text-align: center;
+}
+
+/* 统一的弹窗基础样式 */
+.modal-base {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    width: 280px;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    z-index: 1100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* 所有弹窗继承基础样式 */
+.share-notice,
+#waitAnotherPlayer,
+#rematchRequest,
+#point {
+    composes: modal-base;
+}
+
+/* 特定弹窗的样式调整 */
+#waitAnotherPlayer,
+#rematchRequest,
+#point {
+    background: rgba(255, 255, 255, 0.95);
+    color: #333;
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 480px) {
+    .modal-base {
+        width: 85%;
+        padding: 15px;
+    }
 }
