@@ -2,7 +2,10 @@ package com.tencard.demo01;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.tencard.demo01.saveData.PlayerRepository;
+import com.tencard.demo01.saveData.PlayerService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.websocket.OnClose;
@@ -16,8 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.tencard.demo01.GameUtil.sendMessage;
-
 
 /**
  * yue 2021/8/17
@@ -26,6 +27,12 @@ import static com.tencard.demo01.GameUtil.sendMessage;
 @ServerEndpoint("/room") // 改为room
 @Slf4j
 public class WebSocket4Room {
+
+    @Autowired
+    private PlayerService playerService;
+
+    @Autowired
+    private PlayerRepository playerRepository;
 
     // 房间code -> 房间Id 的映射
     public static Map<String, Long> roomCode2RoomIdMap = new ConcurrentHashMap<>(); // <4396,100007>
@@ -252,6 +259,7 @@ public class WebSocket4Room {
     }
 
     private void notifyOpponent(UserVO user, String type) {
+        log.info("xxxxxxxxxxxxxxxxx--------------------------- notifyOpponent 被执行  xxxxxxxxxxxxxxxxx---------------------------  ");
         // 获取对手的User对象
         UserVO opponent = roomId2UserListMap.get(deviceId2RoomIdMap.get(user.deviceId)).stream()
                 .filter(u -> !u.deviceId.equals(user.deviceId))
@@ -292,6 +300,7 @@ public class WebSocket4Room {
                     GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
                 }
                 // todo 这里做清空 map 的一些操作
+                log.info("xxxxxxxxxxxxxxxxx------------------  这里做清空 map 的一些操作  xxxxxxxxxxxxxxxxx---------------------------  ");
                 break;
         }
     }
@@ -327,7 +336,7 @@ public class WebSocket4Room {
                 .filter(p -> !p.deviceId.equals(deviceId))  // deviceId是拒绝的玩家，所以另一个是发起请求的玩家
                 .findFirst()
                 .orElse(null);
-        
+
         if (requester == null) return;
 
         // 发送拒绝消息给发起请求的玩家
@@ -337,6 +346,11 @@ public class WebSocket4Room {
             response.put("type", "rematch_reject");
             sendMessage(requesterSession, response.toJSONString());
         }
+
+        // 3. 清理房间相关数据
+        WebSocket4Game.roomStataMap.remove(roomId);
+        roomId2UserListMap.remove(roomId);
+        deviceId2RoomIdMap.remove(deviceId);
     }
 }
 

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Random;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -18,25 +19,27 @@ public class PlayerService {
         return playerRepository.findAll();
     }
 
-    public Player getPlayerByUsername(String username) {
-        return playerRepository.findByUsername(username);
+    public Player findByDeviceId(String deviceId) {
+        return playerRepository.findByDeviceId(deviceId);
     }
 
     /**
      * 随机创建一个玩家，并返回该玩家的信息。
      */
-    public Player createRandomPlayer(String s) {
+    public Player createRandomPlayer(String deviceId) {
+        final Player byDeviceId = playerRepository.findByDeviceId(deviceId);
         // 生成随机的中文名字
         String randomUsername = generateRandomChineseName(2);  // 生成2个汉字的名字
 
         // 生成随机的胜利场次和失败场次（1到100之间）
         Random random = new Random();
-        int wins = random.nextInt(100) + 1;  // 1到100之间的随机整数
-        int losses = random.nextInt(100) + 1;  // 1到100之间的随机整数
+        int wins = 0;
+        int losses = 0;
 
         // 创建玩家对象
         Player player = new Player();
-        player.setUsername(randomUsername);
+        player.setDeviceId(deviceId);
+        player.setNickName(randomUsername);
         player.setWins(wins);
         player.setLosses(losses);
 
@@ -45,7 +48,7 @@ public class PlayerService {
         log.info("新建了一条数据 player: {}", savedPlayer);
 
         // 返回查询结果
-        return playerRepository.findByUsername(randomUsername);
+        return playerRepository.findByDeviceId(deviceId);
     }
 
     /**
@@ -71,6 +74,25 @@ public class PlayerService {
 
     public void deletePlayer(Long id) {
         playerRepository.deleteById(id);
+    }
+
+    // 新增: 创建用户方法
+    public Player createPlayer(String deviceId, String nickName) {
+        // 检查是否已存在
+        Player player1 = playerRepository.findByDeviceId(deviceId);
+        if (player1 != null) {
+            log.info("用户已经存在");
+            return player1;
+        }
+
+        // 创建新用户
+        Player player = new Player();
+        player.setDeviceId(deviceId);
+        player.setNickName(nickName);
+        player.setWins(0);
+        player.setLosses(0);
+        
+        return playerRepository.save(player);
     }
 
     // 其他业务逻辑方法

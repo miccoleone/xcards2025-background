@@ -343,7 +343,7 @@
             case '100':
                 // 延迟显示胜利结果
                 setTimeout(() => {
-                    showResult(isRedSide ? "胜利！" : "失败！", isRedSide);
+                    showResult(isRedSide ? "胜利" : "失败", isRedSide);
                     document.getElementById("answer").style.visibility = "visible";
                     disableAllMyCards();
                     document.getElementById("point").style.visibility = "hidden";
@@ -353,7 +353,7 @@
             case '200':
                 // 延迟示失败结果
                 setTimeout(() => {
-                    showResult(isRedSide ? "失败！" : "胜利！", !isRedSide);
+                    showResult(isRedSide ? "失败" : "胜利", !isRedSide);
                     document.getElementById("answer").style.visibility = "visible";
                     disableAllMyCards();
                     document.getElementById("point").style.visibility = "hidden";

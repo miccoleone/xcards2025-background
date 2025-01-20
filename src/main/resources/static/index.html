@@ -80,12 +80,12 @@
                     <div id="rematchRequest" style="display: none;">
                         <p style="margin-bottom: 15px;">对手请求继续游戏</p>
                         <div class="rematch-buttons">
-                            <button onclick="rejectRematch()" class="btn-reject">拒绝</button>
-                            <button onclick="acceptRematch()" class="btn-accept">接受</button>
+                            <button onclick="rejectRematch()" class="btn-reject" style="background-color: red; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">拒绝</button>
+                            <button onclick="acceptRematch()" class="btn-accept" style="background-color: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">接受</button>
                         </div>
                     </div>
                     <div id="point" style="display: none;">
-                        <label>请出牌</label>
+                        <label style="color:#4CAF50FF;">请出牌</label>
                     </div>
                     <br>
                     <br>
@@ -349,9 +349,9 @@
             const resultText = document.getElementById('resultText');
             
             if (isWinner === null) {
-                resultText.textContent = '双赢！';
+                resultText.textContent = '双赢';
             } else {
-                resultText.textContent = isWinner ? '胜利！' : '失败！';
+                resultText.textContent = isWinner ? '胜利' : '失败';
                 // 播放对应的音效
                 if (isWinner) {
                     playVictorySound();
@@ -362,10 +362,10 @@
                 disableAllCards();
                 $('#mySide').addClass('game-completed');
             }
-            
+
             // 显示home图标
             $('.home-icon').show();
-            
+
             // 添加游戏选项按钮
             const gameOptions = `
                 <div class="game-options">
@@ -537,7 +537,7 @@
         // 播放音效函数
         function playClickSound() {
             const sound = document.getElementById('clickSound');
-            sound.volume = 0.5;
+            sound.volume = 0.7;
             sound.currentTime = 0;
             sound.play().catch(e => console.log('播放音效失败:', e));
         }
@@ -547,10 +547,10 @@
             let nickname = localStorage.getItem("nickname");
             if (!nickname) {
                 nickname = prompt("请输入您的昵称：");
-                if (nickname) {
+                if (nickname.trim()) {
                     localStorage.setItem("nickname", nickname);
                 } else {
-                    nickname = "匿名玩家";
+                    nickname = "玩家";
                 }
             }
             return nickname;
@@ -761,6 +761,16 @@
                 $(`#my${i}`).prop('disabled', false).removeClass('disabled');
             }
         }
+
+        // 在页面加载时检查用户信息
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查是否有deviceId，没有则生成
+            if (!localStorage.getItem('deviceId')) {
+                localStorage.setItem('deviceId', uuid.v4());
+            }
+
+        });
+
     </script>
 
     <!-- 使用新的弹窗结构 -->
@@ -772,7 +782,7 @@
     </div>
 
     <div class="start-overlay" id="startOverlay">
-        <div class="start-text">游戏开始！</div>
+        <div class="start-text">游戏开始</div>
     </div>
 </body>
 </html> 

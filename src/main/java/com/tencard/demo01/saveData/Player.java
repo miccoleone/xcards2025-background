@@ -24,7 +24,10 @@ public class Player {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String username;
+    private String deviceId;
+
+    @Column(nullable = false, unique = false)
+    private String nickName;
 
     @Column(nullable = false)
     private Integer wins;
