@@ -249,9 +249,11 @@
                         connectGameSocket();
                         
                         // 如果是蓝方且只有一个玩家，显示等待提示
-                        if (myData.role === 'blueSide' && !opponentData) {
+                        if (myData.role === 'blueSide' && data.length === 1) {
                             $('#waitAnotherPlayer').show();
                             $('#waitAnotherPlayer button').text('等待对手进入....');
+                            // 禁用所有牌
+                            disableAllCards();
                         }
                     }
                     
@@ -262,6 +264,8 @@
                         $('#opponentName').text('对手: ' + opponentData.nickName);
                         $('#opponentWinRate').text('胜率: ' + opponentData.winRate + '%');
                         showGameStart();
+                        // 游戏刚开 启用自己的牌
+                        resetGameState4Begin();
                     }
                 }
             } catch (error) {
@@ -369,7 +373,7 @@
             // 添加游戏选项按钮
             const gameOptions = `
                 <div class="game-options">
-                    <button onclick="goHome()" class="btn btn-primary">主页</button>
+                    <button onclick="leaveRoomToHome()" class="btn btn-primary">主页</button>
                     <button onclick="requestRematch()" class="btn btn-success">
                         ${isWinner ? '继续游戏' : '不服再战'}
                     </button>
@@ -394,7 +398,7 @@
                     const shareNotice = `
                 <div class="share-notice">
                     <p>${window.shareTitle}</p>
-                    <p>点击左上角分享按钮分享战绩！</p>
+                    <p>连战连捷! 点击左上角分享战绩！</p>
                 </div>
             `;
                     // 移除旧的提示（如果存在）
@@ -604,6 +608,17 @@
             }
         }
 
+        // 游戏刚开始（双方刚进入房间）
+        function resetGameState4Begin() {
+            // 移除所有翻牌动画和禁用状态
+            $('#mySide .card-side button').removeClass('flip disabled'); // 玩家自己的牌
+//            $('#opponentSide .card-side button').removeClass('flip disabled'); // 对手的牌
+
+            // 启用所有牌
+            $('#mySide .card-side button').prop('disabled', false); // 玩家自己的牌
+//            $('#opponentSide .card-side button').prop('disabled', false); // 对手的牌
+        }
+
         // 重置游戏状态
         function resetGameState() {
             // 移除所有翻牌动画和禁用状态
@@ -620,22 +635,41 @@
             $('.home-icon').hide();
         }
 
-        // 修改函数名和相关逻辑
+        // 普通的返回主页
         function goHome() {
-            // 显示确认对话框
-            if (confirm('确定要返回主页吗？当前游戏进度将丢失。')) {
-                showPage('roomPage');
-                resetGameState();
-                // 清理游戏相关状态
-                $('#opponentSide').hide();
-                $('#mySide').hide();
-                $('#waitAnotherPlayer').hide();
-                $('.game-options').remove();
-                // 重置输入框
-                $('#roomCodeInput').val('').prop('disabled', false);
-                $('#joinBtn').prop('disabled', false);
-                $('#loadingMessage').hide();
-            }
+            showPage('roomPage');
+            resetGameState();
+            // 清理游戏相关状态
+            $('#opponentSide').hide();
+            $('#mySide').hide();
+            $('#waitAnotherPlayer').hide();
+            $('.game-options').remove();
+            // 重置输入框
+            $('#roomCodeInput').val('').prop('disabled', false);
+            $('#joinBtn').prop('disabled', false);
+            $('#loadingMessage').hide();
+        }
+
+        // 游戏结束后从game-options返回主页
+        function leaveRoomToHome() {
+            showPage('roomPage');
+            resetGameState();
+            // 清理游戏相关状态
+            $('#opponentSide').hide();
+            $('#mySide').hide();
+            $('#waitAnotherPlayer').hide();
+            $('.game-options').remove();
+            // 重置输入框
+            $('#roomCodeInput').val('').prop('disabled', false);
+            $('#joinBtn').prop('disabled', false);
+            $('#loadingMessage').hide();
+            
+            // 发送拒绝匹配消息，通知对手
+            const message = {
+                deviceId: deviceId,
+                type: 'rematch_reject'
+            };
+            roomSocket.send(JSON.stringify(message));
         }
 
         function requestRematch() {
@@ -725,16 +759,6 @@
             
             // 重置游戏状态
             resetGameState();
-            
-//            // 显示游戏开始动画
-//            const startOverlay = document.getElementById('startOverlay');
-//            startOverlay.classList.add('show');
-//            playStartSound();
-//            setTimeout(() => {
-//                startOverlay.classList.remove('show');
-//                // 启用牌
-//                enableRemainingCards();
-//            }, 2000);
         }
 
         // 添加拒绝再战的处理函数

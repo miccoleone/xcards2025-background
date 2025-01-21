@@ -180,18 +180,6 @@ public class WebSocket4Room {
         });
     }
 
-    private void handleRematchResponse(UserVO user) {
-        if ("rematch_accept".equals(user.type)) {
-            // 重置游戏状态
-            Long roomId = deviceId2RoomIdMap.get(user.deviceId);
-            if (roomId != null) {
-                WebSocket4Game.resetGameState(roomId);
-            }
-        }
-        // 通知发起方响应结果
-        notifyOpponent(user, user.type);
-    }
-
     private void handleJoinRoom(UserVO user, Session session) {
         log.info("/room - Processing join room request for room: {}", user.roomCode);
         
@@ -219,7 +207,7 @@ public class WebSocket4Room {
             user.setMsgCode(GameUtil.RED_JOIN_GAME); // 60
             deviceId2RoomIdMap.put(user.deviceId,roomId);
             roomId2UserListMap.computeIfAbsent(roomId, k -> new ArrayList<>()).add(user);
-            updateBluePlayerSessionData(roomId2UserListMap,roomId);// 更新房主的session信息
+//            updateBluePlayerSessionData(roomId2UserListMap,roomId);// 更新房主的session信息
 
             // 获取最新的用户列表
             final List<UserVO> updatedUsers = roomId2UserListMap.get(roomId);
@@ -229,7 +217,7 @@ public class WebSocket4Room {
                  *            2.蓝色方(房主)在游戏页面接收到websocket的onmessage对手信息，要显示敌方信息
                  *  */
                 if(e.session == null) return;
-                log.info("/room ---------- 发送消息 sessionId: {},userRole:{}", e.session.getId(), e.role);
+                log.info("/room ---------- 发送消息 sessionId: {},userRole:{},message:{}", e.session.getId(), e.role,updatedUsers);
                 sendMessage(e.session, updatedUsers);
             });
         } else {
@@ -243,65 +231,6 @@ public class WebSocket4Room {
             roomId2UserListMap.computeIfAbsent(roomId, k -> new ArrayList<>()).add(user); // <10001L,List<user> users>
             // 房主到场 展示自己的牌
             sendMessage(user.session, roomId2UserListMap.get(roomId));
-        }
-    }
-
-    private void updateBluePlayerSessionData(Map<Long, List<UserVO>> roomId2UserListMap, Long roomId) {
-        try{
-            UserVO red = roomId2UserListMap.get(roomId).stream().findFirst().get();
-            log.info("/room ////////////// 房主 {} 之前的sessionid是 {}",roomId2UserListMap.get(roomId).stream().findFirst().get().deviceId,roomId2UserListMap.get(roomId).stream().findFirst().get().session.getId());
-            red.setSession(deviceId2SessionMap_Room.get(red.deviceId));
-            log.info("/room ////////////// 房主 {} 之后的sessionid是 {}",roomId2UserListMap.get(roomId).stream().findFirst().get().deviceId,roomId2UserListMap.get(roomId).stream().findFirst().get().session.getId());
-
-        }catch (Exception e){
-            log.error("/room //////////////  updateBluePlayerSessionData error : {}",e.toString());
-        }
-    }
-
-    private void notifyOpponent(UserVO user, String type) {
-        log.info("xxxxxxxxxxxxxxxxx--------------------------- notifyOpponent 被执行  xxxxxxxxxxxxxxxxx---------------------------  ");
-        // 获取对手的User对象
-        UserVO opponent = roomId2UserListMap.get(deviceId2RoomIdMap.get(user.deviceId)).stream()
-                .filter(u -> !u.deviceId.equals(user.deviceId))
-                .findFirst()
-                .orElse(null);
-
-        if (opponent == null) {
-            log.warn("/room - Cannot find opponent for user: {}", user.deviceId);
-            return;
-        }
-
-        Session opponentSession = deviceId2SessionMap_Room.get(opponent.deviceId);
-        Session currentSession = deviceId2SessionMap_Room.get(user.deviceId);
-
-        switch (type) {
-            case "rematch_request":
-                // 转发继续游戏请求给对手
-                if (opponentSession != null && opponentSession.isOpen()) {
-                    GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
-                }
-                break;
-
-            case "rematch_accept":
-                // 通知双方重置游戏状态
-                if (currentSession != null && currentSession.isOpen()) {
-                    GameUtil.sendMessage(currentSession, JSON.toJSONString(user));
-                }
-                if (opponentSession != null && opponentSession.isOpen()) {
-                    GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
-                }
-                // 重置游戏状态
-                WebSocket4Game.resetGameState(deviceId2RoomIdMap.get(user.deviceId));
-                break;
-
-            case "rematch_reject":
-                // 通知请求方对方拒绝
-                if (opponentSession != null && opponentSession.isOpen()) {
-                    GameUtil.sendMessage(opponentSession, JSON.toJSONString(user));
-                }
-                // todo 这里做清空 map 的一些操作
-                log.info("xxxxxxxxxxxxxxxxx------------------  这里做清空 map 的一些操作  xxxxxxxxxxxxxxxxx---------------------------  ");
-                break;
         }
     }
 
@@ -347,6 +276,27 @@ public class WebSocket4Room {
             sendMessage(requesterSession, response.toJSONString());
         }
 
+        // 3. 清理房间相关数据
+//        // 获取房间code
+//        String roomCode = null;
+//        for (Map.Entry<String, Long> entry : roomCode2RoomIdMap.entrySet()) {
+//            if (entry.getValue().equals(roomId)) {
+//                roomCode = entry.getKey();
+//                break;
+//            }
+//        }
+//
+//        // 如果找到房间code,通过cleanMap清理所有相关数据
+//        if (roomCode != null) {
+//            // 清理WebSocket4Game中的数据
+//            WebSocket4Game.roomStataMap.remove(roomId);
+//
+//            // 清理WebSocket4Room中的数据
+//            roomCode2RoomIdMap.remove(roomCode);
+//            roomId2UserListMap.remove(roomId);
+//            deviceId2RoomIdMap.remove(deviceId);
+//            deviceId2RoomIdMap.remove(requester.deviceId);
+//        }
         // 3. 清理房间相关数据
         WebSocket4Game.roomStataMap.remove(roomId);
         roomId2UserListMap.remove(roomId);

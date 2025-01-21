@@ -589,3 +589,10 @@ body {
 .btn-accept:hover {
     background-color: darkgreen !important; /* 悬停时变为深绿色 */
 }
+
+/* 确保对手的牌按钮无法点击 */
+#opponentSide .card-side button {
+    pointer-events: none; /* 禁用点击事件 */
+    cursor: not-allowed;  /* 将鼠标指针改为禁用状态 */
+    opacity: 0.6;         /* 让按钮看起来是禁用的状态 */
+}

@@ -70,16 +70,6 @@ public class WebSocket4Game {
         }
     }
 
-    // 根据 session 查找对应的 deviceId
-    private String findDeviceIdBySession_Game(Session session) {
-        for (Map.Entry<String, Session> entry : deviceId2SessionMap_Game.entrySet()) {
-            if (entry.getValue().equals(session)) {
-                return entry.getKey();
-            }
-        }
-        return null;
-    }
-
     @OnMessage
     public void onMessage(String message, Session session) {
         log.info("/game - 收到消息：{}", message);
