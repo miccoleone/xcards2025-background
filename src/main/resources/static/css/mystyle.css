@@ -99,7 +99,7 @@ body {
 
 /* 游戏页面样式 */
 .container-fluid {
-    padding-top: 8vh;
+    padding-top: 4vh; /* 减少顶部padding */
     max-width: 600px;
     margin: 0 auto;
 }
@@ -108,7 +108,7 @@ body {
     display: flex;
     justify-content: center;
     gap: 15px;
-    margin: 8px 0;
+    margin: 4px 0; /* 减少上下间距 */
 }
 
 .card-side button {
@@ -126,7 +126,26 @@ body {
 
 .player-name {
     font-size: 15px;
-    margin: 10px 0;
+    margin: 5px 0;
+}
+
+/* 对手名称样式 */
+#opponentName {
+    font-family: "Hiragino Sans GB", "Microsoft YaHei", sans-serif;  /* 圆体 */
+    color: red;
+}
+
+/* 我的名称样式 */
+#myName {
+    font-family: "Hiragino Sans GB", "Microsoft YaHei", sans-serif;  /* 圆体 */
+    color: #4CAF50;  /* 主题绿色 */
+}
+
+/* 胜率样式 */
+#myWinRate,
+#opponentWinRate {
+    color: #888888;  /* 灰色 */
+    font-size: 14px;
 }
 
 /* 游戏开始提示层样式 */
@@ -327,16 +346,15 @@ body {
     left: 50%;
     transform: translate(-50%, -50%);
     display: flex;
-    gap: 20px;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    padding: 15px 25px;
+    justify-content: center;
+    padding: 20px 30px;
     background: rgba(255, 255, 255, 0.95);
     border-radius: 10px;
-    white-space: nowrap;
     z-index: 10;
-    min-width: 260px; /* 和 .modal-content 的 min-width 一致 */
-    max-width: 80%; /* 和 .modal-content 的 max-width 一致 */
+    min-width: 300px;  /* 增加最小宽度，确保按钮有足够空间 */
+    max-width: 80%;
 }
 
 .game-options button {
@@ -583,11 +601,21 @@ body {
 }
 
 .btn-reject:hover {
-    background-color: darkred !important; /* 悬停时变为深红色 */
+    background-color: darkred !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(220, 20, 60, 0.3);
 }
 
 .btn-accept:hover {
-    background-color: darkgreen !important; /* 悬停时变为深绿色 */
+    background-color: darkgreen !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 100, 0, 0.3);
+}
+
+.btn-reject:active,
+.btn-accept:active {
+    transform: translateY(1px);
+    box-shadow: none;
 }
 
 /* 确保对手的牌按钮无法点击 */
@@ -595,4 +623,92 @@ body {
     pointer-events: none; /* 禁用点击事件 */
     cursor: not-allowed;  /* 将鼠标指针改为禁用状态 */
     opacity: 0.6;         /* 让按钮看起来是禁用的状态 */
+}
+
+/* 添加新的样式 */
+.rematch-buttons {
+    display: flex;
+    gap: 30px; /* 增加按钮之间的间距 */
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.rematch-buttons button {
+    min-width: 80px;
+    padding: 10px 25px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* 统一的按钮组样式 */
+.button-group {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    align-items: center;    /* 确保按钮垂直居中 */
+    margin: 0;             /* 移除上边距 */
+    width: 100%;           /* 占满容器宽度 */
+}
+
+.button-group button {
+    min-width: 100px;
+    padding: 10px 25px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    color: white;
+    white-space: nowrap;  /* 防止文字换行 */
+}
+
+/* 统一的按钮样式 */
+.btn-primary-action {
+    background-color: #4CAF50;
+}
+
+.btn-secondary-action {
+    background-color: #dc3545;
+}
+
+/* 统一的悬停效果 */
+.btn-primary-action:hover,
+.btn-secondary-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-primary-action:hover {
+    background-color: #45a049;
+}
+
+.btn-secondary-action:hover {
+    background-color: #c82333;
+}
+
+/* 统一的点击效果 */
+.btn-primary-action:active,
+.btn-secondary-action:active {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+/* 提示文本样式 */
+.game-options p,
+#rematchRequest p {
+    margin: 0 0 15px 0;    /* 只保留底部间距 */
+    text-align: center;
+    font-size: 16px;
+    color: #333;
+}
+
+/* 统一rematchRequest样式 */
+#rematchRequest {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 30px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 10px;
 }

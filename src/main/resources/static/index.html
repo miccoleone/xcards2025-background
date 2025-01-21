@@ -78,10 +78,10 @@
                         <button type="button" class="btn btn-primary">等待对手进入...</button>
                     </div>
                     <div id="rematchRequest" style="display: none;">
-                        <p style="margin-bottom: 15px;">对手请求继续游戏</p>
-                        <div class="rematch-buttons">
-                            <button onclick="rejectRematch()" class="btn-reject" style="background-color: red; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">拒绝</button>
-                            <button onclick="acceptRematch()" class="btn-accept" style="background-color: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">接受</button>
+                        <p style="margin-bottom: 15px;color:#4CAF50FF;">对手请求继续游戏</p>
+                        <div class="button-group">
+                            <button onclick="rejectRematch()" class="btn-secondary-action">拒绝</button>
+                            <button onclick="acceptRematch()" class="btn-primary-action">接受</button>
                         </div>
                     </div>
                     <div id="point" style="display: none;">
@@ -155,7 +155,11 @@
         function initWebSockets() {
             // 连接房间WebSocket
             try {
-                roomSocket = new WebSocket(`ws://localhost:4396/room?deviceId=${deviceId}`);
+                // 根据当前协议动态选择 WebSocket 协议
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const host = window.location.host;
+                roomSocket = new WebSocket(`${protocol}//${host}/room?deviceId=${deviceId}`);
+                
                 console.log('Attempting to connect to room WebSocket...');
                 
                 roomSocket.onopen = () => {
@@ -244,7 +248,7 @@
                     // 更新自己的信息
                     if (myData) {
                         $('#mySide').show();
-                        $('#myName').text('我: ' + myData.nickName);
+                        $('#myName').text('我：' + myData.nickName);
                         $('#myWinRate').text('胜率: ' + myData.winRate + '%');
                         connectGameSocket();
                         
@@ -261,7 +265,7 @@
                     if (data.length === 2 && opponentData) {
                         $('#waitAnotherPlayer').hide();
                         $('#opponentSide').show();
-                        $('#opponentName').text('对手: ' + opponentData.nickName);
+                        $('#opponentName').text('对手：' + opponentData.nickName);
                         $('#opponentWinRate').text('胜率: ' + opponentData.winRate + '%');
                         showGameStart();
                         // 游戏刚开 启用自己的牌
@@ -273,8 +277,11 @@
             }
         }
 
+        // 连接游戏WebSocket
         function connectGameSocket() {
-            gameSocket = new WebSocket(`ws://localhost:4396/game?deviceId=${deviceId}`);
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            gameSocket = new WebSocket(`${protocol}//${host}/game?deviceId=${deviceId}`);
             
             gameSocket.onopen = () => {
                 console.log('Game WebSocket connected');
@@ -370,16 +377,26 @@
             // 显示home图标
             $('.home-icon').show();
 
+            // 修改游戏结束时显示的选项按钮
+            function showGameOptions(isWinner) {
+                const gameOptions = `
+                    <div class="game-options">
+                        <div class="button-group">
+                            <button onclick="leaveRoomToHome()" class="btn-secondary-action">主页</button>
+                            <button onclick="requestRematch()" class="btn-primary-action">
+                                ${isWinner ? '继续游戏' : '不服再战'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+                $('#centerSide').append(gameOptions);
+            }
+
+            // 显示home图标
+            $('.home-icon').show();
+
             // 添加游戏选项按钮
-            const gameOptions = `
-                <div class="game-options">
-                    <button onclick="leaveRoomToHome()" class="btn btn-primary">主页</button>
-                    <button onclick="requestRematch()" class="btn btn-success">
-                        ${isWinner ? '继续游戏' : '不服再战'}
-                    </button>
-                </div>
-            `;
-            $('#centerSide').append(gameOptions);
+            showGameOptions(isWinner);
             modal.classList.add('visible');
         }
 
@@ -418,17 +435,6 @@
                     window.shareContent = null;
                 }, 200); // 延迟 500 毫秒，确保弹窗关闭动画完成
             }
-        }
-
-        // 显示游戏操作选项
-        function showGameOptions() {
-            const optionsHtml = `
-                <div class="game-options">
-                    <button onclick="goHome()" class="btn btn-primary">主页</button>
-                    <button onclick="requestRematch()" class="btn btn-success">继续游戏</button>
-                </div>
-            `;
-            $('#centerSide').append(optionsHtml);
         }
 
         function playVictorySound() {

@@ -277,30 +277,28 @@ public class WebSocket4Room {
         }
 
         // 3. 清理房间相关数据
-//        // 获取房间code
-//        String roomCode = null;
-//        for (Map.Entry<String, Long> entry : roomCode2RoomIdMap.entrySet()) {
-//            if (entry.getValue().equals(roomId)) {
-//                roomCode = entry.getKey();
-//                break;
-//            }
-//        }
-//
-//        // 如果找到房间code,通过cleanMap清理所有相关数据
-//        if (roomCode != null) {
-//            // 清理WebSocket4Game中的数据
-//            WebSocket4Game.roomStataMap.remove(roomId);
-//
-//            // 清理WebSocket4Room中的数据
-//            roomCode2RoomIdMap.remove(roomCode);
-//            roomId2UserListMap.remove(roomId);
-//            deviceId2RoomIdMap.remove(deviceId);
-//            deviceId2RoomIdMap.remove(requester.deviceId);
-//        }
+        // 获取房间code
+        String roomCode = null;
+        for (Map.Entry<String, Long> entry : roomCode2RoomIdMap.entrySet()) {
+            if (entry.getValue().equals(roomId)) {
+                roomCode = entry.getKey();
+                break;
+            }
+        }
+
+        // 如果找到房间code,通过cleanMap清理所有相关数据
+        if (roomCode != null) {
+            // 清理WebSocket4Game中的数据
+            WebSocket4Game.roomStataMap.remove(roomId);
+
+            // 清理WebSocket4Room中的数据
+            roomCode2RoomIdMap.remove(roomCode);
+            roomId2UserListMap.remove(roomId);
+            deviceId2RoomIdMap.remove(deviceId);
+            deviceId2RoomIdMap.remove(requester.deviceId);
+        }
         // 3. 清理房间相关数据
         WebSocket4Game.roomStataMap.remove(roomId);
-        roomId2UserListMap.remove(roomId);
-        deviceId2RoomIdMap.remove(deviceId);
     }
 }
 
