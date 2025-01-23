@@ -299,6 +299,7 @@ public class WebSocket4Room {
         }
         // 3. 清理房间相关数据
         WebSocket4Game.roomStataMap.remove(roomId);
+        //todo 异步执行清空游戏记录的 map
     }
 }
 

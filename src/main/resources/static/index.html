@@ -18,6 +18,7 @@
     <div id="roomPage" class="page active">
         <div class="game-container">
             <h1>十张牌</h1>
+            <div class="game-tip">输入相同房间号即可联机对战</div>
             <div class="input-container">
                 <input type="number" id="roomCodeInput" placeholder="请输入房间号" autofocus>
                 <button id="joinBtn">进入游戏</button>
@@ -316,6 +317,8 @@
                         window.hasShareNotice = true; // 标记是否需要分享
                         window.shareTitle = data.title; // 保存分享标题
                         window.shareContent = data.content; // 保存分享内容
+                        window.winnerName = data.winnerName; // 保存分享内容
+                        window.loserName = data.loserName; // 保存分享内容
                         break;
                         
                     case 'game_result':
@@ -409,7 +412,9 @@
                 // 显示分享图标并添加分享信息
                 $('.share-icon').addClass('visible')
                               .data('share-title', window.shareTitle)
-                              .data('share-content', window.shareContent);
+                              .data('share-content', window.shareContent)
+                              .data('winnerName', window.winnerName)
+                              .data('loserName', window.loserName);
                 // 如果有分享提示，延迟 500 毫秒后弹出分享战绩提示
                 setTimeout(() => {
                     const shareNotice = `
@@ -433,6 +438,8 @@
                     window.hasShareNotice = false;
                     window.shareTitle = null;
                     window.shareContent = null;
+                    window.winnerName = null;
+                    window.loserName = null;
                 }, 200); // 延迟 500 毫秒，确保弹窗关闭动画完成
             }
         }
@@ -496,6 +503,22 @@
         $(document).ready(function() {
             initializeGamePage();
             initWebSockets();
+            
+            // 提示显示控制
+            function toggleTip() {
+                const tip = $('.game-tip');
+                tip.addClass('show');
+                setTimeout(() => {
+                    tip.removeClass('show');
+                }, 7000);
+            }
+            
+            // 延迟2秒后开始第一次显示
+            setTimeout(() => {
+                toggleTip();
+                // 设置循环显示
+                setInterval(toggleTip, 10000);
+            }, 2000);
             
             // 添加回车键监听
             $('#roomCodeInput').keypress(function(e) {
@@ -703,7 +726,9 @@
             const shareIcon = $('.share-icon');
             const title = shareIcon.data('share-title');
             const content = shareIcon.data('share-content');
-            
+            const winnerName = shareIcon.data('winnerName');
+            const loserName = shareIcon.data('loserName');
+
             // 创建分享内容的容器
             const shareContent = document.createElement('div');
             shareContent.className = 'share-content';
@@ -716,13 +741,12 @@
                     <div class="share-title">你未曾蒙面的义父</div>
                     <div class="share-image">
                         <img src="image/yifu.png" class="main-img" alt="义父">
+                        <div class="winner-name">${winnerName}</div>
+                        <div class="loser-name">${loserName}</div>
                     </div>
-                    <div class="share-result">${content}</div>
                 </div>
                 <div class="share-link">
-                    <a href="http://118.31.102.119:4396/room.html" target="_blank">
-                        点击游戏"义父"即刻邀请你的好友对战吧！
-                    </a>
+                    <span>点击http://localhost:4396/index.html 和你的好友对战吧！</span>
                 </div>
             `;
             
