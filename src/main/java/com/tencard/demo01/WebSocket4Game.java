@@ -247,7 +247,7 @@ public class WebSocket4Game {
                     .orElse("对手");
 
             // 根据不同情况设置不同的分享内容
-            String shareCode = winStreak >= 5 ? "WIN5" : "WIN3";
+            String shareCode = "WIN"+winStreak;
             shareMessage.put("shareCode", shareCode);  // 添加shareCode用于前端判断
             shareMessage.put("winnerName", winnerName);  // 添加胜利者昵称
             shareMessage.put("loserName", loserName);    // 添加失败者昵称
@@ -255,6 +255,10 @@ public class WebSocket4Game {
             switch (shareCode) {
                 case "WIN3":
                     shareMessage.put("title", "连战连捷！");
+                    shareMessage.put("content", String.format("%s：恭喜你喜得义子——%s！", winnerName, loserName));
+                    break;
+                case "WIN4":
+                    shareMessage.put("title", "爆锤！");
                     shareMessage.put("content", String.format("%s：恭喜你喜得义子——%s！", winnerName, loserName));
                     break;
                 case "WIN5":
@@ -268,6 +272,7 @@ public class WebSocket4Game {
             if (winnerSession != null && winnerSession.isOpen()) {
                 sendMessage(winnerSession, shareMessage.toJSONString());
             }
+            //todo  存入H2数据库 后改为异步操作
         }
     }
 

@@ -2,6 +2,7 @@ package com.tencard.demo01;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.tencard.demo01.saveData.Player;
 import com.tencard.demo01.saveData.PlayerRepository;
 import com.tencard.demo01.saveData.PlayerService;
 import lombok.extern.slf4j.Slf4j;
@@ -28,11 +29,18 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class WebSocket4Room {
 
-    @Autowired
-    private PlayerService playerService;
+    private static PlayerService playerService;
+    private static PlayerRepository playerRepository;
 
     @Autowired
-    private PlayerRepository playerRepository;
+    public void setPlayerService(PlayerService service) {
+        playerService = service;
+    }
+
+    @Autowired
+    public void setPlayerRepository(PlayerRepository repository) {
+        playerRepository = repository;
+    }
 
     // 房间code -> 房间Id 的映射
     public static Map<String, Long> roomCode2RoomIdMap = new ConcurrentHashMap<>(); // <4396,100007>
@@ -121,10 +129,33 @@ public class WebSocket4Room {
                 log.error("/room - Invalid message: deviceId or roomCode is null");
                 return;
             }
+            // 根据 deviceId判断是否有这个用户，如果没有那就新建一个
+            checkPlayerInfo(user);
             handleJoinRoom(user, session);
             
         } catch (Exception e) {
             log.error("/room - Error processing message: ", e);
+        }
+    }
+
+    private void checkPlayerInfo(UserVO user) {
+        try {
+            // 查找玩家
+            Player existingPlayer = playerService.findByDeviceId(user.deviceId);
+            
+            if (existingPlayer == null) {
+                // 如果玩家不存在，创建新玩家
+                Player newPlayer = new Player();
+                newPlayer.setDeviceId(user.deviceId);
+                newPlayer.setNickName(user.nickName);
+                newPlayer.setWins(0);
+                newPlayer.setLosses(0);
+                
+                playerService.savePlayer(newPlayer);
+                log.info("Created new player: deviceId={}, nickname={}", user.deviceId, user.nickName);
+            }
+        } catch (Exception e) {
+            log.error("Error checking player info: ", e);
         }
     }
 
@@ -299,7 +330,7 @@ public class WebSocket4Room {
         }
         // 3. 清理房间相关数据
         WebSocket4Game.roomStataMap.remove(roomId);
-        //todo 异步执行清空游戏记录的 map
+        //todo 异步执行 保存游戏记录  清空游戏记录的 map
     }
 }
 

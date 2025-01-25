@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>十张牌</title>
+    <title>智商大作战</title>
     <!-- 基础样式和脚本 -->
     <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuid.min.js"></script>
     <script src="./util/utils.js"></script>
@@ -17,7 +17,7 @@
     <!-- 房间页面 -->
     <div id="roomPage" class="page active">
         <div class="game-container">
-            <h1>十张牌</h1>
+            <h1>智商大作战</h1>
             <div class="game-tip">输入相同房间号即可联机对战</div>
             <div class="input-container">
                 <input type="number" id="roomCodeInput" placeholder="请输入房间号" autofocus>
@@ -411,8 +411,8 @@
             if (window.hasShareNotice) {
                 // 显示分享图标并添加分享信息
                 $('.share-icon').addClass('visible')
-                              .data('share-title', window.shareTitle)
-                              .data('share-content', window.shareContent)
+                              .data('shareTitle', window.shareTitle)
+                              .data('shareContent', window.shareContent)
                               .data('winnerName', window.winnerName)
                               .data('loserName', window.loserName);
                 // 如果有分享提示，延迟 500 毫秒后弹出分享战绩提示
@@ -420,7 +420,7 @@
                     const shareNotice = `
                 <div class="share-notice">
                     <p>${window.shareTitle}</p>
-                    <p>连战连捷! 点击左上角分享战绩！</p>
+                    <p>点击左上角保存战绩截图</p>
                 </div>
             `;
                     // 移除旧的提示（如果存在）
@@ -432,7 +432,7 @@
                         $notice.fadeOut(500, function() {
                             $(this).remove();
                         });
-                    }, 3000);
+                    }, 5000);
 
                     // 重置分享状态
                     window.hasShareNotice = false;
@@ -724,8 +724,8 @@
         // 修改分享功能
         function shareGame() {
             const shareIcon = $('.share-icon');
-            const title = shareIcon.data('share-title');
-            const content = shareIcon.data('share-content');
+            const title = shareIcon.data('shareTitle');
+            const content = shareIcon.data('shareContent');
             const winnerName = shareIcon.data('winnerName');
             const loserName = shareIcon.data('loserName');
 
@@ -733,26 +733,28 @@
             const shareContent = document.createElement('div');
             shareContent.className = 'share-content';
             shareContent.innerHTML = `
-                <div class="share-header">
-                    <img src="image/game-icon.png" class="game-icon" alt="义父">
-                    <span>义父</span>
-                </div>
-                <div class="share-main">
-                    <div class="share-title">你未曾蒙面的义父</div>
-                    <div class="share-image">
-                        <img src="image/yifu.png" class="main-img" alt="义父">
-                        <div class="winner-name">${winnerName}</div>
-                        <div class="loser-name">${loserName}</div>
-                    </div>
-                </div>
-                <div class="share-link">
-                    <span>点击http://localhost:4396/index.html 和你的好友对战吧！</span>
-                </div>
-            `;
-            
+        <div class="share-header">
+            <img src="image/game-icon.png" class="game-icon" alt="义父">
+            <span>十张牌</span>
+        </div>
+        <div class="share-main">
+            <div class="share-title">你未曾蒙面的义父</div>
+            <div class="share-image">
+                <img src="image/yifu.png" class="main-img" alt="义父">
+                <div class="winner-name">${winnerName}</div>
+                <div class="loser-name">${loserName}</div>
+                <!-- 新增时间戳 -->
+                <div class="timestamp">${getCurrentTimestamp()}</div>
+            </div>
+        </div>
+        <div class="share-link">
+            <span>点击http://localhost:4396/index.html 和你的好友对战吧！</span>
+        </div>
+    `;
+
             // 添加到body中以便渲染
             document.body.appendChild(shareContent);
-            
+
             // 使用html2canvas生成图片
             html2canvas(shareContent, {
                 useCORS: true,  // 允许加载跨域图片
@@ -776,6 +778,18 @@
                 document.body.removeChild(shareContent);
             });
         }
+
+        // 获取当前时间戳的函数
+        function getCurrentTimestamp() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            return `${year}${month}${day} ${hours}:${minutes}`;
+        }
+
 
         // 添加接受再战的处理函数
         function acceptRematch() {
