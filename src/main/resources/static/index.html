@@ -220,6 +220,34 @@
                     }, 3000);
                     break;
 
+                case 'game_ready':
+                    console.log('收到game_ready消息，游戏准备开始');
+                    showPage('gamePage');
+                    
+                    const readyPlayers = data.players;
+                    if (readyPlayers && readyPlayers.length === 2) {
+                        const myPlayerData = readyPlayers.find(user => user.deviceId === deviceId);
+                        const opponentPlayerData = readyPlayers.find(user => user.deviceId !== deviceId);
+
+                        if (myPlayerData) {
+                            window.playerRole = myPlayerData.role;
+                            $('#mySide').show();
+                            $('#myName').text('我：' + myPlayerData.nickName);
+                            $('#myWinRate').text('胜率: ' + myPlayerData.winRate + '%');
+                        }
+
+                        if (opponentPlayerData) {
+                            $('#opponentSide').show();
+                            $('#opponentName').text('对手：' + opponentPlayerData.nickName);
+                            $('#opponentWinRate').text('胜率: ' + opponentPlayerData.winRate + '%');
+                        }
+                    }
+                    
+                    $('#waitAnotherPlayer').hide();
+                    showGameStart();
+                    resetGameState4Begin();
+                    break;
+
                 case 'game_start':
                     $('#waitAnotherPlayer').hide();
                     showGameStart();
@@ -263,6 +291,8 @@
                     break;
 
                 case 'rematch_accept':
+                    // ✅ 注意：后端现在在handleRematchAccept中发送game_ready消息
+                    // 这里保持兼容性，处理可能的rematch_accept消息
                     $('#point').hide();
                     $('#waitAnotherPlayer').hide();
                     $('.game-options').remove();
@@ -327,7 +357,7 @@
             const gameOptions = `
                     <div class="game-options">
                         <div class="button-group">
-                            <button onclick="leaveRoomToHome()" class="btn-secondary-action">主页</button>
+                            <button onclick="leaveRoomToHome()" class="btn btn-secondary-action">主页</button>
                             <button onclick="requestRematch()" class="btn-primary-action">
                                 ${isWinner ? '继续游戏' : '不服再战'}
                             </button>
