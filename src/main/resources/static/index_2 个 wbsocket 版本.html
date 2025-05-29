@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智商大作战</title>
+    <!-- 基础样式和脚本 -->
+    <script src="./js/uuid.min.js"></script>
+    <script src="./util/utils.js"></script>
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+    <link href="./css/mystyle.css" rel="stylesheet">
+    <script src="./js/jquery-3.1.1.min.js"></script>
+    <script src="./js/bootstrap3.0.3.min.js"></script>
+    <script src="./js/html2canvas.min.js"></script>
+</head>
+<body>
+    <!-- 房间页面 -->
+    <div id="roomPage" class="page active">
+        <div class="game-container">
+            <h1>智商大作战</h1>
+            <div class="game-tip">输入相同房间号即可联机对战</div>
+            <div class="input-container">
+                <input type="number" id="roomCodeInput" placeholder="请输入房间号" autofocus>
+                <button id="joinBtn">进入游戏</button>
+            </div>
+            <div id="loadingMessage" style="display: none; color: #333; font-size: 18px; margin-top: 20px;">
+                正在进入房间...
+            </div>
+        </div>
+        <div class="room-full-tip" id="roomFullTip">
+            房间已满
+        </div>
+    </div>
+    
+    <!-- 游戏页面 -->
+    <div id="gamePage" class="page">
+        <div class="home-icon" onclick="goHome()">
+            <svg viewBox="0 0 24 24" width="24" height="24">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" fill="currentColor"/>
+            </svg>
+        </div>
+        <div class="share-icon" onclick="shareGame()">
+            <svg viewBox="0 0 24 24" width="24" height="24">
+                <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" fill="currentColor"/>
+            </svg>
+        </div>
+        <div class="container-fluid">
+            <div class="row clearfix" style="text-align: center">
+                <div id="opponentSide" style="display: none;">
+                    <div class="col-md-24 column">
+                        <br>
+                        <div class="player-name" style="color: red" id="opponentName"></div>
+                        <div id="opponentWinRate"></div>
+                        <br>
+                        <div class="card-side">
+                            <button id="opp1" type="button" class="btn btn-default opponent-card">1</button>
+                            <button id="opp2" type="button" class="btn btn-default opponent-card">2</button>
+                            <button id="opp3" type="button" class="btn btn-default opponent-card">3</button>
+                            <button id="opp4" type="button" class="btn btn-default opponent-card">4</button>
+                            <button id="opp5" type="button" class="btn btn-default opponent-card">5</button>
+                        </div>
+                    </div>
+                    <br>
+                    <div class="col-md-24 column">
+                        <div class="card-side">
+                            <button id="opp6" type="button" class="btn btn-default  opponent-card">6</button>
+                            <button id="opp7" type="button" class="btn btn-default opponent-card">7</button>
+                            <button id="opp8" type="button" class="btn btn-default opponent-card">8</button>
+                            <button id="opp9" type="button" class="btn btn-default opponent-card">9</button>
+                            <button id="opp10" type="button" class="btn btn-default opponent-card">10</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="centerSide">
+                    <br>
+                    <br>
+                    <div id="waitAnotherPlayer" style="display: none;">
+                        <button type="button" class="btn btn-primary">等待对手进入...</button>
+                    </div>
+                    <div id="rematchRequest" style="display: none;">
+                        <p style="margin-bottom: 15px;color:#4CAF50FF;">对手请求继续游戏</p>
+                        <div class="button-group">
+                            <button onclick="rejectRematch()" class="btn-secondary-action">拒绝</button>
+                            <button onclick="acceptRematch()" class="btn-primary-action">接受</button>
+                        </div>
+                    </div>
+                    <div id="point" style="display: none;">
+                        <label style="color:#4CAF50FF;">请出牌</label>
+                    </div>
+                    <br>
+                    <br>
+                </div>
+
+                <div id="mySide" style="display: none;">
+                    <div class="col-md-24 column">
+                        <div class="card-side">
+                            <button id="my1" type="button" class="btn btn-default" onclick="sendCard(1)">1</button>
+                            <button id="my2" type="button" class="btn btn-default" onclick="sendCard(2)">2</button>
+                            <button id="my3" type="button" class="btn btn-default" onclick="sendCard(3)">3</button>
+                            <button id="my4" type="button" class="btn btn-default" onclick="sendCard(4)">4</button>
+                            <button id="my5" type="button" class="btn btn-default" onclick="sendCard(5)">5</button>
+                        </div>
+                    </div>
+                    <br>
+                    <div class="col-md-24 column">
+                        <div class="card-side">
+                            <button id="my6" type="button" class="btn btn-default" onclick="sendCard(6)">6</button>
+                            <button id="my7" type="button" class="btn btn-default" onclick="sendCard(7)">7</button>
+                            <button id="my8" type="button" class="btn btn-default" onclick="sendCard(8)">8</button>
+                            <button id="my9" type="button" class="btn btn-default" onclick="sendCard(9)">9</button>
+                            <button id="my10" type="button" class="btn btn-default" onclick="sendCard(10)">10</button>
+                        </div>
+                    </div>
+                    <br>
+                    <div class="player-name" id="myName">我</div>
+                    <div id="myWinRate"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音频资源 -->
+    <audio id="footstepSound" preload="auto">
+        <source src="audio/footstep.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="sendCardSound" preload="auto">
+        <source src="audio/sendCard.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="startSound" preload="auto">
+        <source src="audio/start.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="clickSound" preload="auto">
+        <source src="audio/click.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="victorySound" preload="auto">
+        <source src="audio/victory.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="defeatSound" preload="auto">
+        <source src="audio/defeat.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // WebSocket连接管理
+        let gameSocket = null;
+        let roomSocket = null;
+        const deviceId = localStorage.getItem("deviceId") || generateDeviceId();
+
+        // 页面切换函数
+        function showPage(pageId) {
+            $('.page').removeClass('active');
+            $(`#${pageId}`).addClass('active');
+        }
+
+        // 初始化WebSocket连接
+        function initWebSockets() {
+            // 连接房间WebSocket
+            try {
+                // 根据当前协议动态选择 WebSocket 协议
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const host = window.location.host;
+                roomSocket = new WebSocket(`${protocol}//${host}/room?deviceId=${deviceId}`);
+                
+                console.log('Attempting to connect to room WebSocket...');
+                
+                roomSocket.onopen = () => {
+                    console.log('Room WebSocket connected successfully');
+                };
+                
+                roomSocket.onerror = (error) => {
+                    console.error('Room WebSocket error:', error);
+                    alert('连接服务器失败，请刷新页面重试');
+                };
+                
+                roomSocket.onclose = () => {
+                    console.log('Room WebSocket connection closed');
+                };
+                
+                roomSocket.onmessage = (event) => {
+                    handleRoomMessage(event);
+                };
+            } catch (error) {
+                console.error('Error creating room WebSocket:', error);
+            }
+        }
+
+        // 在script标签中添加消息处理函数
+        function handleRoomMessage(event) {
+            console.log('Room message received:', event.data);
+            try {
+                const data = JSON.parse(event.data);
+                
+                // 处理再战请求
+                if (data.type === 'rematch_request') {
+                    // 隐藏游戏结果弹窗
+                    $('#resultOverlay').removeClass('visible');
+                    // 显示再战请求对话框
+                    $('#rematchRequest').show();
+                    $('.game-options').remove();  // 移除当前的游戏选项
+                    return;
+                }
+                
+                // 处理再战接受
+                if (data.type === 'rematch_accept') {
+                    $('#point').hide();
+                    $('#waitAnotherPlayer').hide();
+                    $('.game-options').remove();
+                    // 显示对手信息和牌
+                    $('#opponentSide').show();
+                    // 启用所有牌
+                    enableAllCards();
+                    // 显示游戏开始动画
+                    const startOverlay = document.getElementById('startOverlay');
+                    startOverlay.classList.add('show');
+                    playStartSound();
+                    setTimeout(() => {
+                        startOverlay.classList.remove('show');
+                    }, 2000);
+                    return;
+                }
+                
+                // 处理再战拒绝
+                if (data.type === 'rematch_reject') {
+                    // 发起请求的玩家直接返回主页
+                    showPage('roomPage');
+                    resetGameState();
+                    // 清理游戏相关状态
+                    $('#opponentSide').hide();
+                    $('#mySide').hide();
+                    $('#waitAnotherPlayer').hide();
+                    $('.game-options').remove();
+                    // 重置输入框
+                    $('#roomCodeInput').val('').prop('disabled', false);
+                    $('#joinBtn').prop('disabled', false);
+                    $('#loadingMessage').hide();
+                    return;
+                }
+                
+                if (Array.isArray(data)) {
+                    showPage('gamePage');
+                    
+                    // 找到自己和对手的数据
+                    const myData = data.find(user => user.deviceId === deviceId);
+                    const opponentData = data.find(user => user.deviceId !== deviceId);
+                    
+                    // 保存角色信息
+                    window.playerRole = myData.role;
+                    
+                    // 更新自己的信息
+                    if (myData) {
+                        $('#mySide').show();
+                        $('#myName').text('我：' + myData.nickName);
+                        $('#myWinRate').text('胜率: ' + myData.winRate + '%');
+                        connectGameSocket();
+                        
+                        // 如果是蓝方且只有一个玩家，显示等待提示
+                        if (myData.role === 'blueSide' && data.length === 1) {
+                            $('#waitAnotherPlayer').show();
+                            $('#waitAnotherPlayer button').text('等待对手进入....');
+                            // 禁用所有牌
+                            disableAllCards();
+                        }
+                    }
+                    
+                    // 如果有两个玩家
+                    if (data.length === 2 && opponentData) {
+                        $('#waitAnotherPlayer').hide();
+                        $('#opponentSide').show();
+                        $('#opponentName').text('对手：' + opponentData.nickName);
+                        $('#opponentWinRate').text('胜率: ' + opponentData.winRate + '%');
+                        showGameStart();
+                        // 游戏刚开 启用自己的牌
+                        resetGameState4Begin();
+                    }
+                }
+            } catch (error) {
+                console.error('Error handling room message:', error);
+            }
+        }
+
+        // 连接游戏WebSocket
+        function connectGameSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            gameSocket = new WebSocket(`${protocol}//${host}/game?deviceId=${deviceId}`);
+            
+            gameSocket.onopen = () => {
+                console.log('Game WebSocket connected');
+                // 在连接成功后设置消息处理函数
+                gameSocket.onmessage = function(event) {
+                    console.log('Game message received:', event.data);
+                    try {
+                        const data = JSON.parse(event.data);
+                        // 直接处理解析后的数据，而不是整个event
+                        handleGameMessage(data);
+                    } catch (error) {
+                        console.error('Error handling game message:', error);
+                    }
+                };
+            };
+        }
+
+        function handleGameMessage(data) {
+            try {
+                switch (data.type) {
+                    case 'round_complete':
+                        // 处理回合完成消息
+                        const myCard = data.myCard;
+                        const oppCard = data.oppCard;
+                        $(`#opp${oppCard}`).addClass('flip');
+                        playCardSound();
+                        enableRemainingCards();
+                        break;
+                        
+                    case 'share':  // 添加分享消息的处理
+                        // 设置分享状态
+                        window.hasShareNotice = true; // 标记是否需要分享
+                        window.shareTitle = data.title; // 保存分享标题
+                        window.shareContent = data.content; // 保存分享内容
+                        window.winnerName = data.winnerName; // 保存分享内容
+                        window.loserName = data.loserName; // 保存分享内容
+                        break;
+                        
+                    case 'game_result':
+                        // 等待翻牌动画完成后再显示结果
+                        setTimeout(() => {
+                            switch (data.result) {
+                                case 'red_win':
+                                    showGameResult(window.playerRole === 'redSide');
+                                    break;
+                                case 'blue_win':
+                                    showGameResult(window.playerRole === 'blueSide');
+                                    break;
+                                case 'draw':
+                                    showGameResult(null);
+                                    break;
+                            }
+                        }, 1500);
+                        break;
+                        
+                    case 'please_take_card':
+                        $('#point').show();
+                        playFootstepSound();
+                        enableRemainingCards();
+                        break;
+                }
+            } catch (error) {
+                console.error('Error in handleGameMessage:', error);
+            }
+        }
+
+        function showGameStart() {
+            $('#startOverlay').addClass('show');
+            playStartSound();
+            setTimeout(() => {
+                $('#startOverlay').removeClass('show');
+            }, 2000);
+        }
+
+        // 显示游戏结果
+        function showGameResult(isWinner) {
+            const modal = document.getElementById('resultOverlay');
+            const resultText = document.getElementById('resultText');
+            
+            if (isWinner === null) {
+                resultText.textContent = '双赢';
+            } else {
+                resultText.textContent = isWinner ? '胜利' : '失败';
+                // 播放对应的音效
+                if (isWinner) {
+                    playVictorySound();
+                } else {
+                    playDefeatSound();
+                }
+                // 直接在这里禁用所有牌
+                disableAllCards();
+                $('#mySide').addClass('game-completed');
+            }
+
+            // 显示home图标
+            $('.home-icon').show();
+
+            // 修改游戏结束时显示的选项按钮
+            function showGameOptions(isWinner) {
+                const gameOptions = `
+                    <div class="game-options">
+                        <div class="button-group">
+                            <button onclick="leaveRoomToHome()" class="btn-secondary-action">主页</button>
+                            <button onclick="requestRematch()" class="btn-primary-action">
+                                ${isWinner ? '继续游戏' : '不服再战'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+                $('#centerSide').append(gameOptions);
+            }
+
+            // 显示home图标
+            $('.home-icon').show();
+
+            // 添加游戏选项按钮
+            showGameOptions(isWinner);
+            modal.classList.add('visible');
+        }
+
+        // 关闭结果弹窗
+        function closeResult() {
+            const modal = document.getElementById('resultOverlay');
+            modal.classList.remove('visible');
+            // 检查是否需要分享
+            if (window.hasShareNotice) {
+                // 显示分享图标并添加分享信息
+                $('.share-icon').addClass('visible')
+                              .data('shareTitle', window.shareTitle)
+                              .data('shareContent', window.shareContent)
+                              .data('winnerName', window.winnerName)
+                              .data('loserName', window.loserName);
+                // 如果有分享提示，延迟 500 毫秒后弹出分享战绩提示
+                setTimeout(() => {
+                    const shareNotice = `
+                <div class="share-notice">
+                    <p>${window.shareTitle}</p>
+                    <p>点击左上角保存战绩截图</p>
+                </div>
+            `;
+                    // 移除旧的提示（如果存在）
+                    $('.share-notice').remove();
+                    // 添加新的提示
+                    const $notice = $(shareNotice).appendTo('#centerSide');
+                    // 3秒后自动消失
+                    setTimeout(() => {
+                        $notice.fadeOut(500, function() {
+                            $(this).remove();
+                        });
+                    }, 5000);
+
+                    // 重置分享状态
+                    window.hasShareNotice = false;
+                    window.shareTitle = null;
+                    window.shareContent = null;
+                    window.winnerName = null;
+                    window.loserName = null;
+                }, 200); // 延迟 500 毫秒，确保弹窗关闭动画完成
+            }
+        }
+
+        function playVictorySound() {
+            const sound = document.getElementById('victorySound');
+            sound.volume = 0.5;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        function playDefeatSound() {
+            const sound = document.getElementById('defeatSound');
+            sound.volume = 0.5;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        function handleCardPlay(card) {
+            $(`#opp${card}`).addClass('flip');
+            playCardSound();
+        }
+
+        function playStartSound() {
+            const sound = document.getElementById('startSound');
+            sound.volume = 0.5;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        function playCardSound() {
+            const sound = document.getElementById('sendCardSound');
+            sound.volume = 0.5;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        function playFootstepSound() {
+            const sound = document.getElementById('footstepSound');
+            sound.volume = 0.5;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        function initializeGamePage() {
+            // 隐藏所有游戏相关元素
+            $('#opponentSide').hide();
+            $('#mySide').hide();
+            $('#waitAnotherPlayer').hide();
+            $('#answer').hide();
+            $('#rematchRequest').hide();
+            $('#point').hide();
+            $('#resultOverlay').removeClass('show');
+            $('.home-icon').hide();  // 初始化时隐藏home图标
+            
+            // 重置所有卡牌状态
+            $('.card-side button').removeClass('flip');
+            $('.card-side button').prop('disabled', false);
+        }
+
+        $(document).ready(function() {
+            initializeGamePage();
+            initWebSockets();
+            
+            // 提示显示控制
+            function toggleTip() {
+                const tip = $('.game-tip');
+                tip.addClass('show');
+                setTimeout(() => {
+                    tip.removeClass('show');
+                }, 7000);
+            }
+            
+            // 延迟2秒后开始第一次显示
+            setTimeout(() => {
+                toggleTip();
+                // 设置循环显示
+                setInterval(toggleTip, 10000);
+            }, 2000);
+            
+            // 添加回车键监听
+            $('#roomCodeInput').keypress(function(e) {
+                if (e.which === 13) {  // 13是回车键的keyCode
+                    $('#joinBtn').click();  // 触发点击事件
+                }
+            });
+            
+            $('#joinBtn').click(function() {
+                let roomCode = $('#roomCodeInput').val().trim();
+                if (!roomCode) {
+                    alert("请输入房间号！");
+                    return;
+                }
+                
+                if (!roomSocket || roomSocket.readyState !== WebSocket.OPEN) {
+                    console.error('WebSocket not connected. State:', roomSocket ? roomSocket.readyState : 'null');
+                    alert("正在连接服务器，请稍后重试...");
+                    initWebSockets();
+                    return;
+                }
+                
+                console.log('Sending join request for room:', roomCode);
+                
+                let playerData = {
+                    deviceId: deviceId,
+                    roomCode: roomCode,
+                    userCode: '',
+                    nickName: getNickname()
+                };
+                
+                try {
+                    roomSocket.send(JSON.stringify(playerData));
+                    console.log('Join request sent successfully');
+                    playClickSound();
+                    $('#loadingMessage').show();
+                    $('#joinBtn').prop('disabled', true);
+                    $('#roomCodeInput').prop('disabled', true);  // 也禁用输入框
+                } catch (error) {
+                    console.error('Error sending join request:', error);
+                    alert('发送请求失败，请重试');
+                    $('#loadingMessage').hide();
+                    $('#joinBtn').prop('disabled', false);
+                    $('#roomCodeInput').prop('disabled', false);  // 确保输入框可用
+                }
+            });
+        });
+
+        // 播放音效函数
+        function playClickSound() {
+            const sound = document.getElementById('clickSound');
+            sound.volume = 0.7;
+            sound.currentTime = 0;
+            sound.play().catch(e => console.log('播放音效失败:', e));
+        }
+
+        // 获取昵称
+        function getNickname() {
+            let nickname = localStorage.getItem("nickname");
+            if (!nickname) {
+                nickname = prompt("请输入您的昵称：");
+                if (nickname.trim()) {
+                    localStorage.setItem("nickname", nickname);
+                } else {
+                    nickname = "玩家";
+                }
+            }
+            return nickname;
+        }
+
+        // 添加出牌相关函数
+        function sendCard(card) {
+            if (!gameSocket || gameSocket.readyState !== WebSocket.OPEN) {
+                console.error('Game WebSocket not connected');
+                return;
+            }
+
+            try {
+                playCardSound();
+                // 临时禁用所有牌，等待对手出牌
+                $('.card-side button:not(.flip)').prop('disabled', true);
+                // 隐藏出牌提示
+                $('#point').hide();
+                
+                // 添加翻牌动画
+                $(`#my${card}`).addClass('flip');
+                
+                // 发送出牌消息
+                const message = {
+                    deviceId: deviceId,
+                    card: card,
+                    role: window.playerRole
+                };
+                gameSocket.send(JSON.stringify(message));
+                
+            } catch (error) {
+                console.error('Error sending card:', error);
+                enableRemainingCards();
+            }
+        }
+
+        // 禁用所有牌
+        function disableAllCards() {
+            for (let i = 1; i <= 10; i++) {
+                $(`#my${i}`).prop('disabled', true).addClass('disabled');
+            }
+        }
+
+        // 启用剩余的牌
+        function enableRemainingCards() {
+            for (let i = 1; i <= 10; i++) {
+                const card = $(`#my${i}`);
+                if (!card.hasClass('flip')) {
+                    card.prop('disabled', false);
+                }
+            }
+        }
+
+        // 游戏刚开始（双方刚进入房间）
+        function resetGameState4Begin() {
+            // 移除所有翻牌动画和禁用状态
+            $('#mySide .card-side button').removeClass('flip disabled'); // 玩家自己的牌
+//            $('#opponentSide .card-side button').removeClass('flip disabled'); // 对手的牌
+
+            // 启用所有牌
+            $('#mySide .card-side button').prop('disabled', false); // 玩家自己的牌
+//            $('#opponentSide .card-side button').prop('disabled', false); // 对手的牌
+        }
+
+        // 重置游戏状态
+        function resetGameState() {
+            // 移除所有翻牌动画和禁用状态
+            $('.card-side button').removeClass('flip disabled');
+            // 移除游戏完成标记
+            $('#mySide').removeClass('game-completed');
+            // 启用所有牌
+            $('.card-side button').prop('disabled', false);
+            // 隐藏结果弹窗
+            $('#resultOverlay').removeClass('visible');
+            // 隐藏出牌提示
+            $('#point').hide();
+            // 隐藏home图标
+            $('.home-icon').hide();
+        }
+
+        // 普通的返回主页
+        function goHome() {
+            showPage('roomPage');
+            resetGameState();
+            // 清理游戏相关状态
+            $('#opponentSide').hide();
+            $('#mySide').hide();
+            $('#waitAnotherPlayer').hide();
+            $('.game-options').remove();
+            // 重置输入框
+            $('#roomCodeInput').val('').prop('disabled', false);
+            $('#joinBtn').prop('disabled', false);
+            $('#loadingMessage').hide();
+        }
+
+        // 游戏结束后从game-options返回主页
+        function leaveRoomToHome() {
+            showPage('roomPage');
+            resetGameState();
+            // 清理游戏相关状态
+            $('#opponentSide').hide();
+            $('#mySide').hide();
+            $('#waitAnotherPlayer').hide();
+            $('.game-options').remove();
+            // 重置输入框
+            $('#roomCodeInput').val('').prop('disabled', false);
+            $('#joinBtn').prop('disabled', false);
+            $('#loadingMessage').hide();
+            
+            // 发送拒绝匹配消息，通知对手
+            const message = {
+                deviceId: deviceId,
+                type: 'rematch_reject'
+            };
+            roomSocket.send(JSON.stringify(message));
+        }
+
+        function requestRematch() {
+            const message = {
+                deviceId: deviceId,
+                type: 'rematch_request'
+            };
+            roomSocket.send(JSON.stringify(message));
+            
+            // 重置自己的牌但保持禁用状态
+            resetGameState();
+            disableAllCards();
+            $('.game-options').remove();
+            $('#waitAnotherPlayer').hide();
+            // 隐藏对手信息和牌
+            $('#opponentSide').hide();
+            
+            // 显示等待提示
+            $('#waitAnotherPlayer').show()
+                .find('button').text('等待对手进入....');
+        }
+
+        // 修改分享功能
+        function shareGame() {
+            const shareIcon = $('.share-icon');
+            const title = shareIcon.data('shareTitle');
+            const content = shareIcon.data('shareContent');
+            const winnerName = shareIcon.data('winnerName');
+            const loserName = shareIcon.data('loserName');
+
+            // 创建分享内容的容器
+            const shareContent = document.createElement('div');
+            shareContent.className = 'share-content';
+            shareContent.innerHTML = `
+        <div class="share-header">
+            <img src="image/game-icon.png" class="game-icon" alt="义父">
+            <span>十张牌</span>
+        </div>
+        <div class="share-main">
+            <div class="share-title">你未曾蒙面的义父</div>
+            <div class="share-image">
+                <img src="image/yifu.png" class="main-img" alt="义父">
+                <div class="winner-name">${winnerName}</div>
+                <div class="loser-name">${loserName}</div>
+                <!-- 新增时间戳 -->
+                <div class="timestamp">${getCurrentTimestamp()}</div>
+            </div>
+        </div>
+        <div class="share-link">
+            <span>点击https://a985ced5c2a54919b9436aab65bd56b8--4396.ap-shanghai.cloudstudio.club/ 和你的好友对战吧！</span>
+        </div>
+    `;
+
+            // 添加到body中以便渲染
+            document.body.appendChild(shareContent);
+
+            // 使用html2canvas生成图片
+            html2canvas(shareContent, {
+                useCORS: true,  // 允许加载跨域图片
+                backgroundColor: null  // 透明背景
+            }).then(canvas => {
+                try {
+                    const imgUrl = canvas.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.download = '游戏战绩.png';
+                    link.href = imgUrl;
+                    link.click();
+                } catch (error) {
+                    console.error('Error generating share image:', error);
+                    alert('生成分享图片失败，请重试');
+                } finally {
+                    document.body.removeChild(shareContent);
+                }
+            }).catch(error => {
+                console.error('Error with html2canvas:', error);
+                alert('生成分享图片失败，请重试');
+                document.body.removeChild(shareContent);
+            });
+        }
+
+        // 获取当前时间戳的函数
+        function getCurrentTimestamp() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            return `${year}${month}${day} ${hours}:${minutes}`;
+        }
+
+
+        // 添加接受再战的处理函数
+        function acceptRematch() {
+            const message = {
+                deviceId: deviceId,
+                type: 'rematch_accept'
+            };
+            roomSocket.send(JSON.stringify(message));
+            $('#rematchRequest').hide();
+            $('#waitAnotherPlayer').hide();
+            
+            // 重置游戏状态
+            resetGameState();
+        }
+
+        // 添加拒绝再战的处理函数
+        function rejectRematch() {
+            const message = {
+                deviceId: deviceId,
+                type: 'rematch_reject'
+            };
+            roomSocket.send(JSON.stringify(message));
+            $('#rematchRequest').hide();
+
+            // 显示返回主页按钮
+            const gameOptions = `
+                <div class="game-options">
+                    <button onclick="goHome()" class="btn btn-primary">返回主页</button>
+                </div>
+            `;
+            $('#centerSide').append(gameOptions);
+        }
+
+        // 添加启用所有牌的函数
+        function enableAllCards() {
+            for (let i = 1; i <= 10; i++) {
+                $(`#my${i}`).prop('disabled', false).removeClass('disabled');
+            }
+        }
+
+        // 在页面加载时检查用户信息
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查是否有deviceId，没有则生成
+            if (!localStorage.getItem('deviceId')) {
+                localStorage.setItem('deviceId', uuid.v4());
+            }
+
+        });
+
+    </script>
+
+    <!-- 使用新的弹窗结构 -->
+    <div class="game-result-modal" id="resultOverlay">
+        <div class="modal-content">
+            <h2 id="resultText"></h2>
+            <button onclick="closeResult()" class="confirm-btn">确认</button>
+        </div>
+    </div>
+
+    <div class="start-overlay" id="startOverlay">
+        <div class="start-text">游戏开始</div>
+    </div>
+</body>
+</html> 
