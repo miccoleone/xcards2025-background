@@ -170,6 +170,28 @@ public class WebSocket4Match {
     private void handleJoinRoom(UserVO user) {
         String deviceId = user.getDeviceId();
         String roomCode = user.getRoomCode();
+        String nickname = user.getNickName();
+        
+        // 🔥 昵称内容安全检查
+        log.info("🔥 开始检查昵称: {}", nickname);
+        if (nickname == null || nickname.trim().isEmpty()) {
+            log.warn("🔥 昵称为空，拒绝加入房间");
+            sendErrorMessage(user.getSession(), "昵称不能为空");
+            return;
+        }
+        
+        // 简单的敏感词检查
+        String[] sensitiveWords = {"系统", "管理员", "admin", "fuck", "shit", "政府"};
+        String lowerNickname = nickname.toLowerCase();
+        for (String word : sensitiveWords) {
+            if (lowerNickname.contains(word.toLowerCase())) {
+                log.warn("🔥 昵称包含敏感词，拒绝加入房间: {}", nickname);
+                sendErrorMessage(user.getSession(), "昵称包含敏感词，请重新输入");
+                return;
+            }
+        }
+        
+        log.info("🔥 昵称检查通过: {}", nickname);
 
         user.setWinRate(49);
         user.setUserCode(GameUtil.getNextUserCode());
@@ -585,15 +607,33 @@ public class WebSocket4Match {
         }
     }
 
-    private long calculateWinStreak(String playerId, Long roomId) {
-        List<GameState> records = playerGameRecords.get(playerId);
-        if (records == null) return 0;
+//    private long calculateWinStreak(String playerId, Long roomId) {
+//        List<GameState> records = playerGameRecords.get(playerId);
+//        if (records == null) return 0;
+//
+//        return records.stream()
+//                .sorted((a, b) -> b.getGameEndTime().compareTo(a.getGameEndTime()))
+//                .takeWhile(record -> record.getRoomId().equals(roomId) && record.getWinner().equals(playerId))
+//                .count();
+//    }
+private long calculateWinStreak(String playerId, Long roomId) {
+    List<GameState> records = playerGameRecords.get(playerId);
+    if (records == null) return 0;
 
-        return records.stream()
-                .sorted((a, b) -> b.getGameEndTime().compareTo(a.getGameEndTime()))
-                .takeWhile(record -> record.getRoomId().equals(roomId) && record.getWinner().equals(playerId))
-                .count();
+    // 按结束时间降序排序
+    records.sort((a, b) -> b.getGameEndTime().compareTo(a.getGameEndTime()));
+
+    long count = 0;
+    for (GameState record : records) {
+        if (record.getRoomId().equals(roomId) && record.getWinner().equals(playerId)) {
+            count++;
+        } else {
+            break;
+        }
     }
+    return count;
+}
+
 
     /**
      * 处理玩家断开连接（业务逻辑层）
@@ -662,6 +702,16 @@ public class WebSocket4Match {
                 }
             }
         }
+    }
+    
+    /**
+     * 发送错误消息
+     */
+    private void sendErrorMessage(Session session, String message) {
+        JSONObject response = new JSONObject();
+        response.put("type", "nickname_error");
+        response.put("message", message);
+        GameUtil.sendMessage(session, response);
     }
 }
 

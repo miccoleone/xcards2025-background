@@ -22,6 +22,15 @@ public class PlayerController {
         return playerService.getAllPlayers();
     }
 
+    @GetMapping("/insertTestData")
+    public Object insertTestData() {
+        for (int i = 0; i < 10; i++) {
+            Player player = new Player(null, "deviceId" + i, "nickName" + i, 0, 0);
+            playerService.savePlayer(player);
+        }
+        return ResponseEntity.status(HttpStatus.OK);
+    }
+
     @GetMapping("/{username}")
     public Player getPlayerByUsername(@PathVariable String username) {
         return playerService.createRandomPlayer(username); // 用于测试创建数据

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>基于 Spring Boot 的 WebSocket 实战：从握手到心跳的完整实现</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;padding:24px;line-height:1.65;color:#0f172a;background:#f8fafc}
+    a{color:#2563eb;text-decoration:none}
+    pre{background:#0b1023;color:#e5e7eb;padding:14px;border-radius:8px;overflow:auto}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace}
+    h1{margin-top:0}
+    .container{max-width:900px;margin:0 auto}
+    .muted{color:#64748b}
+    .hr{height:1px;background:#e2e8f0;margin:18px 0}
+    .back{display:inline-block;margin-bottom:12px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a class="back" href="/">← 返回首页</a>
+    <h1>基于 Spring Boot 的 WebSocket 实战：从握手到心跳的完整实现</h1>
+    <p class="muted">本文介绍在 Spring Boot 中使用标准 WebSocket（javax.websocket）实现端到端通信，并补齐心跳与超时控制的关键细节。</p>
+
+    <h2>1. 启用 WebSocket</h2>
+    <p>在 Spring Boot 内嵌容器环境，注册 ServerEndpointExporter 即可扫描 @ServerEndpoint 标注的端点：</p>
+    <pre><code class="language-java">import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.server.standard.ServerEndpointExporter;
+
+@Component
+public class WebSocketConfig {
+    @Bean
+    public ServerEndpointExporter serverEndpointExporter() {
+        return new ServerEndpointExporter();
+    }
+}</code></pre>
+
+    <h2>2. 定义端点与基本事件</h2>
+    <pre><code class="language-java">import javax.websocket.*;
+import javax.websocket.server.ServerEndpoint;
+import java.util.concurrent.ConcurrentHashMap;
+
+@ServerEndpoint("/ws")
+public class WsEndpoint {
+    private static final ConcurrentHashMap<String, Session> SESSIONS = new ConcurrentHashMap<>();
+
+    @OnOpen
+    public void onOpen(Session session) {
+        SESSIONS.put(session.getId(), session);
+        send(session, "{\\"type\\":\\"welcome\\"}");
+    }
+
+    @OnMessage
+    public void onMessage(String msg, Session session) {
+        // 根据自定义协议处理消息
+        send(session, "{\\"type\\":\\"echo\\",\\"data\\":" + msg + "}");
+    }
+
+    @OnClose
+    public void onClose(Session session) {
+        SESSIONS.remove(session.getId());
+    }
+
+    @OnError
+    public void onError(Session session, Throwable t) {
+        t.printStackTrace();
+    }
+
+    private void send(Session s, String text) {
+        try { s.getBasicRemote().sendText(text); } catch (Exception ignored) {}
+    }
+}</code></pre>
+
+    <h2>3. 心跳与超时</h2>
+    <p>建议采用“应用层心跳”：客户端定期发送 ping，服务端回复 pong，并在服务端维护最近一次心跳时间戳，超时则主动关闭连接。</p>
+    <pre><code class="language-java">// 伪代码：处理心跳
+if ("ping".equals(type)) {
+    lastHeartbeat.put(sessionId, System.currentTimeMillis());
+    send(session, "{\"type\":\"pong\"}");
+}</code></pre>
+    <p>同时在反向代理层（如 Nginx）提升超时阈值：</p>
+    <pre><code class="language-nginx">location /ws {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+}</code></pre>
+
+    <h2>4. 协议建议</h2>
+    <ul>
+      <li>统一消息格式：{type, version, traceId, payload}</li>
+      <li>对 type 做穷举处理，未知类型记录并忽略</li>
+      <li>限制单条消息大小与频率，防止滥用</li>
+    </ul>
+
+    <div class="hr"></div>
+    <p class="muted">以上示例为教学用途，可按需拓展鉴权、路由与广播等能力。</p>
+  </div>
+</body>
+</html>
