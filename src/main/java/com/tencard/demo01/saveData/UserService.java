@@ -6,28 +6,27 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Random;
-import java.util.Optional;
 
 @Slf4j
 @Service
-public class PlayerService {
+public class UserService {
 
     @Autowired
-    private PlayerRepository playerRepository;
+    private UserRepository userRepository;
 
-    public List<Player> getAllPlayers() {
-        return playerRepository.findAll();
+    public List<UserVO> getAllPlayers() {
+        return userRepository.findAll();
     }
 
-    public Player findByDeviceId(String deviceId) {
-        return playerRepository.findByDeviceId(deviceId);
+    public UserVO findByDeviceId(String deviceId) {
+        return userRepository.findByDeviceId(deviceId);
     }
 
     /**
      * 随机创建一个玩家，并返回该玩家的信息。
      */
-    public Player createRandomPlayer(String deviceId) {
-        final Player byDeviceId = playerRepository.findByDeviceId(deviceId);
+    public UserVO createRandomPlayer(String deviceId) {
+        final UserVO byDeviceId = userRepository.findByDeviceId(deviceId);
         // 生成随机的中文名字
         String randomUsername = generateRandomChineseName(2);  // 生成2个汉字的名字
 
@@ -37,18 +36,18 @@ public class PlayerService {
         int losses = 0;
 
         // 创建玩家对象
-        Player player = new Player();
-        player.setDeviceId(deviceId);
-        player.setNickName(randomUsername);
-        player.setWins(wins);
-        player.setLosses(losses);
+        UserVO userVO = new UserVO();
+        userVO.setDeviceId(deviceId);
+        userVO.setNickName(randomUsername);
+        userVO.setWins(wins);
+        userVO.setLosses(losses);
 
         // 保存玩家到数据库
-        Player savedPlayer = playerRepository.save(player);
-        log.info("新建了一条数据 player: {}", savedPlayer);
+        UserVO savedUserVO = userRepository.save(userVO);
+        log.info("新建了一条数据 player: {}", savedUserVO);
 
         // 返回查询结果
-        return playerRepository.findByDeviceId(deviceId);
+        return userRepository.findByDeviceId(deviceId);
     }
 
     /**
@@ -68,31 +67,31 @@ public class PlayerService {
         return name.toString();
     }
 
-    public Player savePlayer(Player player) {
-        return playerRepository.save(player);
+    public UserVO savePlayer(UserVO userVO) {
+        return userRepository.save(userVO);
     }
 
     public void deletePlayer(Long id) {
-        playerRepository.deleteById(id);
+        userRepository.deleteById(id);
     }
 
     // 新增: 创建用户方法
-    public Player createPlayer(String deviceId, String nickName) {
+    public UserVO createPlayer(String deviceId, String nickName) {
         // 检查是否已存在
-        Player player1 = playerRepository.findByDeviceId(deviceId);
-        if (player1 != null) {
+        UserVO userVO1 = userRepository.findByDeviceId(deviceId);
+        if (userVO1 != null) {
             log.info("用户已经存在");
-            return player1;
+            return userVO1;
         }
 
         // 创建新用户
-        Player player = new Player();
-        player.setDeviceId(deviceId);
-        player.setNickName(nickName);
-        player.setWins(0);
-        player.setLosses(0);
+        UserVO userVO = new UserVO();
+        userVO.setDeviceId(deviceId);
+        userVO.setNickName(nickName);
+        userVO.setWins(0);
+        userVO.setLosses(0);
         
-        return playerRepository.save(player);
+        return userRepository.save(userVO);
     }
 
     // 其他业务逻辑方法

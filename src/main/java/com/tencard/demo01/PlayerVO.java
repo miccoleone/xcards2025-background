@@ -6,7 +6,7 @@ import javax.validation.constraints.NotBlank;
 import javax.websocket.Session;
 
 @Data
-public class UserVO {
+public class PlayerVO {
     private static final long serialVersionUID = 1L;
 
     public Long id;

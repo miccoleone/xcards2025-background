@@ -11,7 +11,7 @@ import javax.persistence.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Player {
+public class UserVO {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "player_seq")

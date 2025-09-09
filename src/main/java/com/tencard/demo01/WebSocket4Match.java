@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import javax.websocket.*;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -108,7 +107,7 @@ public class WebSocket4Match {
 
             switch (type) {
                 case "join_room":
-                    UserVO user = JSON.parseObject(message, UserVO.class);
+                    PlayerVO user = JSON.parseObject(message, PlayerVO.class);
                     if (user.getDeviceId() == null || user.getRoomCode() == null) {
                         log.error("/match - Invalid join_room message: deviceId or roomCode is null");
                         return;
@@ -167,7 +166,7 @@ public class WebSocket4Match {
         return deviceId;
     }
 
-    private void handleJoinRoom(UserVO user) {
+    private void handleJoinRoom(PlayerVO user) {
         String deviceId = user.getDeviceId();
         String roomCode = user.getRoomCode();
         String nickname = user.getNickName();
@@ -200,7 +199,7 @@ public class WebSocket4Match {
             Long roomId = roomCode2RoomIdMap.get(roomCode);
             Room room = rooms.get(roomId);
             if (room == null || room.getPlayers().size() >= 2) {
-                UserVO response = new UserVO();
+                PlayerVO response = new PlayerVO();
                 response.setType("room_full");
                 GameUtil.sendMessage(user.getSession(), response);
                 return;
@@ -265,7 +264,7 @@ public class WebSocket4Match {
         String role = room.getPlayers().stream()
                 .filter(p -> p.getDeviceId().equals(deviceId))
                 .findFirst()
-                .map(UserVO::getRole)
+                .map(PlayerVO::getRole)
                 .orElse(null);
         if (role == null) return;
 
@@ -275,7 +274,7 @@ public class WebSocket4Match {
             JSONObject roundInfo = new JSONObject();
             roundInfo.put("type", "round_complete");
             roundInfo.put("round", room.getGameState().getRoundNumber());
-            for (UserVO player : room.getPlayers()) {
+            for (PlayerVO player : room.getPlayers()) {
                 if (GameUtil.RoleEnum.redSide.toString().equals(player.getRole())) {
                     roundInfo.put("myCard", room.getGameState().getCurrentRedCard());
                     roundInfo.put("oppCard", room.getGameState().getCurrentBlueCard());
@@ -290,10 +289,10 @@ public class WebSocket4Match {
             if (GameState.RESULT_CONTINUE.equals(result)) {
                 room.getGameState().nextRound();
             } else {
-                UserVO redPlayer = room.getPlayers().stream()
+                PlayerVO redPlayer = room.getPlayers().stream()
                         .filter(p -> GameUtil.RoleEnum.redSide.toString().equals(p.getRole()))
                         .findFirst().orElse(null);
-                UserVO bluePlayer = room.getPlayers().stream()
+                PlayerVO bluePlayer = room.getPlayers().stream()
                         .filter(p -> GameUtil.RoleEnum.blueSide.toString().equals(p.getRole()))
                         .findFirst().orElse(null);
                 if (redPlayer == null || bluePlayer == null) return;
@@ -310,7 +309,7 @@ public class WebSocket4Match {
                 broadcastToRoom(room, resultInfo);
             }
         } else {
-            UserVO opponent = room.getPlayers().stream()
+            PlayerVO opponent = room.getPlayers().stream()
                     .filter(p -> !p.getDeviceId().equals(deviceId))
                     .findFirst().orElse(null);
             if (opponent != null) {
@@ -342,7 +341,7 @@ public class WebSocket4Match {
             }
 
             // 找到对方玩家
-            UserVO opponent = room.getPlayers().stream()
+            PlayerVO opponent = room.getPlayers().stream()
                     .filter(p -> !p.getDeviceId().equals(deviceId))
                     .findFirst().orElse(null);
             
@@ -421,10 +420,10 @@ public class WebSocket4Match {
             return;
         }
 
-        UserVO requester = room.getPlayers().stream()
+        PlayerVO requester = room.getPlayers().stream()
                 .filter(p -> p.getDeviceId().equals(requesterId))
                 .findFirst().orElse(null);
-        UserVO opponent = room.getPlayers().stream()
+        PlayerVO opponent = room.getPlayers().stream()
                 .filter(p -> !p.getDeviceId().equals(requesterId))
                 .findFirst().orElse(null);
         if (requester == null || opponent == null) {
@@ -495,10 +494,10 @@ public class WebSocket4Match {
         }
 
         // 找到拒绝方和请求方
-        UserVO rejecter = room.getPlayers().stream()
+        PlayerVO rejecter = room.getPlayers().stream()
                 .filter(p -> p.getDeviceId().equals(deviceId))
                 .findFirst().orElse(null);
-        UserVO requester = room.getPlayers().stream()
+        PlayerVO requester = room.getPlayers().stream()
                 .filter(p -> !p.getDeviceId().equals(deviceId))
                 .findFirst().orElse(null);
         
@@ -542,7 +541,7 @@ public class WebSocket4Match {
     }
 
     private void broadcastRoomState(Room room) {
-        List<UserVO> players = room.getPlayers();
+        List<PlayerVO> players = room.getPlayers();
         JSONObject roomState = new JSONObject();
         roomState.put("type", "room_state");
         roomState.put("players", players);
@@ -550,7 +549,7 @@ public class WebSocket4Match {
     }
 
     private void broadcastToRoom(Room room, Object message) {
-        for (UserVO player : room.getPlayers()) {
+        for (PlayerVO player : room.getPlayers()) {
             Session session = player.getSession();
             if (session != null && session.isOpen()) {
                 GameUtil.sendMessage(session, message);
@@ -577,11 +576,11 @@ public class WebSocket4Match {
             shareMessage.put("type", "share");
             String winnerName = room.getPlayers().stream()
                     .filter(p -> p.getDeviceId().equals(winner))
-                    .map(UserVO::getNickName)
+                    .map(PlayerVO::getNickName)
                     .findFirst().orElse("玩家");
             String loserName = room.getPlayers().stream()
                     .filter(p -> p.getDeviceId().equals(loser))
-                    .map(UserVO::getNickName)
+                    .map(PlayerVO::getNickName)
                     .findFirst().orElse("对手");
             String shareCode = "WIN" + winStreak;
             shareMessage.put("shareCode", shareCode);
@@ -647,7 +646,7 @@ private long calculateWinStreak(String playerId, Long roomId) {
         if (room == null) return;
 
         // 找到对方玩家
-        UserVO opponent = room.getPlayers().stream()
+        PlayerVO opponent = room.getPlayers().stream()
                 .filter(p -> !p.getDeviceId().equals(deviceId))
                 .findFirst().orElse(null);
         
@@ -717,7 +716,7 @@ private long calculateWinStreak(String playerId, Long roomId) {
 
 class Room {
     private final Long id;
-    private final List<UserVO> players = new ArrayList<>();
+    private final List<PlayerVO> players = new ArrayList<>();
     private final GameState gameState = new GameState();
     private final Map<String, List<Integer>> playerDecks = new HashMap<>();
 
@@ -729,7 +728,7 @@ class Room {
         return id;
     }
 
-    public List<UserVO> getPlayers() {
+    public List<PlayerVO> getPlayers() {
         return players;
     }
 
@@ -737,12 +736,12 @@ class Room {
         return gameState;
     }
 
-    public void addPlayer(UserVO player) {
+    public void addPlayer(PlayerVO player) {
         players.add(player);
     }
 
     public void resetPlayerDecks() {
-        for (UserVO player : players) {
+        for (PlayerVO player : players) {
             playerDecks.put(player.getDeviceId(), new ArrayList<>(
                     IntStream.rangeClosed(1, GameState.TEN).boxed().collect(Collectors.toList())
             ));
