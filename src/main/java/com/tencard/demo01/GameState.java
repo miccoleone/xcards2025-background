@@ -209,4 +209,13 @@ public class GameState implements Cloneable {
         BeanUtils.copyProperties(this, gameRecord);
         return gameRecord;
     }
+
+    // Explicitly add getters to fix compilation issues
+    public Long getRoomId() {
+        return roomId;
+    }
+
+    public LocalDateTime getGameEndTime() {
+        return gameEndTime;
+    }
 }

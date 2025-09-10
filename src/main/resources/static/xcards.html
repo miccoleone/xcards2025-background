@@ -138,7 +138,8 @@
 
 <script>
     let matchSocket = null;
-    const deviceId = localStorage.getItem("deviceId") || generateDeviceId();
+    const openId = localStorage.getItem("openId") || new Date().getTime();
+    localStorage.setItem("openId", openId);
 
     function showPage(pageId) {
         $('.page').removeClass('active');
@@ -149,7 +150,7 @@
         try {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.host;
-            matchSocket = new WebSocket(`${protocol}//${host}/match?deviceId=${deviceId}`);
+            matchSocket = new WebSocket(`${protocol}//${host}/match?openId=${openId}`);
 
             console.log('Attempting to connect to match WebSocket...');
 
@@ -186,15 +187,15 @@
                 case 'room_state':
                     showPage('gamePage');
                     const players = data.players;
-                    const myData = players.find(user => user.deviceId === deviceId);
-                    const opponentData = players.find(user => user.deviceId !== deviceId);
+                    const myData = players.find(user => user.openId == openId);
+                    const opponentData = players.find(user => user.openId != openId);
 
                     window.playerRole = myData.role;
 
                     if (myData) {
                         $('#mySide').show();
                         $('#myName').text('我：' + myData.nickName);
-                        $('#myWinRate').text('胜率: ' + myData.winRate + '%');
+                        $('#myWinRate').text('胜率: ' + (myData.winRate || 0) + '%');
 
                         if (myData.role === 'blueSide' && players.length === 1) {
                             $('#waitAnotherPlayer').show();
@@ -206,7 +207,7 @@
                     if (players.length === 2 && opponentData) {
                         $('#opponentSide').show();
                         $('#opponentName').text('对手：' + opponentData.nickName);
-                        $('#opponentWinRate').text('胜率: ' + opponentData.winRate + '%');
+                        $('#opponentWinRate').text('胜率: ' + (opponentData.winRate || 0) + '%');
                     }
                     break;
 
@@ -226,20 +227,20 @@
                     
                     const readyPlayers = data.players;
                     if (readyPlayers && readyPlayers.length === 2) {
-                        const myPlayerData = readyPlayers.find(user => user.deviceId === deviceId);
-                        const opponentPlayerData = readyPlayers.find(user => user.deviceId !== deviceId);
+                        const myPlayerData = readyPlayers.find(user => user.openId == openId);
+                        const opponentPlayerData = readyPlayers.find(user => user.openId != openId);
 
                         if (myPlayerData) {
                             window.playerRole = myPlayerData.role;
                             $('#mySide').show();
                             $('#myName').text('我：' + myPlayerData.nickName);
-                            $('#myWinRate').text('胜率: ' + myPlayerData.winRate + '%');
+                            $('#myWinRate').text('胜率: ' + (myPlayerData.winRate || 0) + '%');
                         }
 
                         if (opponentPlayerData) {
                             $('#opponentSide').show();
                             $('#opponentName').text('对手：' + opponentPlayerData.nickName);
-                            $('#opponentWinRate').text('胜率: ' + opponentPlayerData.winRate + '%');
+                            $('#opponentWinRate').text('胜率: ' + (opponentPlayerData.winRate || 0) + '%');
                         }
                     }
                     
@@ -498,17 +499,30 @@
             $('#joinBtn').prop('disabled', true);
             $('#roomCodeInput').prop('disabled', true);
             
-            console.log('🔥🔥🔥 准备显示昵称输入模态框 🔥🔥🔥');
+            console.log('🔥🔥🔥 检查是否有保存的昵称 🔥🔥🔥');
             
-            // 强制清除昵称缓存
-            localStorage.removeItem("nickname");
-            console.log('已清除昵称缓存');
+            // 检查是否有保存的昵称
+            const savedNickname = localStorage.getItem("nickname");
+            console.log('保存的昵称:', savedNickname);
             
-            // 🔥🔥🔥 强制阻止默认行为，必须通过昵称检查 🔥🔥🔥
-            console.log('🔥🔥🔥 阻止直接加入房间，必须先检查昵称 🔥🔥🔥');
-            
-            // 显示昵称输入模态框
-            showNicknameModal(roomCode);
+            if (savedNickname && savedNickname.trim()) {
+                console.log('🔥🔥🔥 使用保存的昵称直接加入房间 🔥🔥🔥');
+                // 直接使用保存的昵称加入房间
+                const message = {
+                    type: "join_room",
+                    openId: openId,
+                    roomCode: roomCode,
+                    nickName: savedNickname.trim()
+                };
+                
+                console.log('发送加入房间请求:', message);
+                matchSocket.send(JSON.stringify(message));
+                $('#loadingMessage').show();
+            } else {
+                console.log('🔥🔥🔥 没有保存的昵称，显示输入模态框 🔥🔥🔥');
+                // 显示昵称输入模态框
+                showNicknameModal(roomCode);
+            }
             
             // 🔥🔥🔥 重要：阻止任何可能的直接加入房间的行为 🔥🔥🔥
             return false;
@@ -568,7 +582,7 @@
             
             const message = {
                 type: "join_room",
-                deviceId: deviceId,
+                openId: openId,
                 roomCode: roomCode,
                 nickName: guestNickname
             };
@@ -648,7 +662,7 @@
                 // 发送加入房间请求
                 let playerData = {
                     type: "join_room",
-                    deviceId: deviceId,
+                    openId: openId,
                     roomCode: roomCode,
                     nickName: nickname
                 };
@@ -691,7 +705,7 @@
                 },
                 body: JSON.stringify({
                     nickname: nickname,
-                    deviceId: deviceId
+                    openId: openId
                 })
             });
             
@@ -755,7 +769,7 @@
 
             const message = {
                 type: "play_card",
-                deviceId: deviceId,
+                openId: openId,
                 card: card
             };
             matchSocket.send(JSON.stringify(message));
@@ -781,7 +795,7 @@
     }
 
     function resetGameState4Begin() {
-        $('#mySide .card-side button').removeClass('flip disabled');
+        $('.card-side button').removeClass('flip disabled');
         $('#mySide .card-side button').prop('disabled', false);
     }
 
@@ -808,7 +822,7 @@
         if (matchSocket && matchSocket.readyState === WebSocket.OPEN) {
             const message = {
                 type: "leave_room",
-                deviceId: deviceId
+                openId: openId
             };
             matchSocket.send(JSON.stringify(message));
             matchSocket.close();
@@ -828,7 +842,7 @@
 
         const message = {
             type: "rematch_request",
-            deviceId: deviceId
+            openId: openId
         };
         matchSocket.send(JSON.stringify(message));
 
@@ -911,7 +925,7 @@
 
         const message = {
             type: "rematch_accept",
-            deviceId: deviceId
+            openId: openId
         };
         matchSocket.send(JSON.stringify(message));
         $('#rematchRequest').hide();
@@ -928,7 +942,7 @@
 
         const message = {
             type: "rematch_reject",
-            deviceId: deviceId
+            openId: openId
         };
         matchSocket.send(JSON.stringify(message));
         $('#rematchRequest').hide();
@@ -948,8 +962,8 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        if (!localStorage.getItem('deviceId')) {
-            localStorage.setItem('deviceId', uuid.v4());
+        if (!localStorage.getItem('openId')) {
+            localStorage.setItem('openId', new Date().getTime());
         }
     });
 </script>

@@ -2,7 +2,9 @@ package com.tencard.demo01;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.tencard.demo01.saveData.UserService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.websocket.*;
@@ -13,71 +15,104 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Component
 @ServerEndpoint("/match")
-@Slf4j
+// @Slf4j // Keep this commented out to ensure manual logger is used
 public class WebSocket4Match {
 
-    // 设备ID -> 会话映射
-    private static final Map<String, Session> deviceId2SessionMap = new ConcurrentHashMap<>();
+    private static final Logger log = LoggerFactory.getLogger(WebSocket4Match.class);
+
+    // Service needs to be static to be accessed from a non-Spring-managed WebSocket endpoint
+    private static UserService userService;
+
+    @Autowired
+    public void setUserService(UserService userService) {
+        WebSocket4Match.userService = userService;
+    }
+
+    // openId -> 会话映射
+    private static final Map<String, Session> openId2SessionMap = new ConcurrentHashMap<>();
     // 房间ID -> Room 对象映射
     private static final Map<Long, Room> rooms = new ConcurrentHashMap<>();
-    // 设备ID -> 房间ID 映射
-    private static final Map<String, Long> deviceId2RoomIdMap = new ConcurrentHashMap<>();
+    // openId -> 房间ID 映射
+    private static final Map<String, Long> openId2RoomIdMap = new ConcurrentHashMap<>();
     // 房间Code -> 房间ID 映射
     private static final Map<String, Long> roomCode2RoomIdMap = new ConcurrentHashMap<>();
-    // 玩家游戏记录：设备ID -> List<GameState>
+    // 玩家游戏记录：openId -> List<GameState>
     private static final Map<String, List<GameState>> playerGameRecords = new ConcurrentHashMap<>();
-    // 正在处理离开房间的设备ID集合，防止重复处理
-    private static final Set<String> leavingDeviceIds = ConcurrentHashMap.newKeySet();
+    // 正在处理离开房间的openId集合，防止重复处理
+    private static final Set<String> leavingOpenIds = ConcurrentHashMap.newKeySet();
 
     @OnOpen
     public void onOpen(Session session) {
-        String deviceId = session.getRequestParameterMap().get("deviceId").get(0);
-        log.info("/match - Device ID: {} connected with session ID: {}", deviceId, session.getId());
-        if (deviceId == null) {
-            log.warn("/match - No deviceId found in the connection request");
+        String openId = null;
+        try {
+            openId = session.getRequestParameterMap().get("openId").get(0);
+        } catch (Exception e) {
+            log.error("/match - Could not get openId from session, closing connection", e);
+            try {
+                session.close();
+            } catch (IOException ioException) {
+                log.error("Error closing session", ioException);
+            }
             return;
         }
-        // 清洗 deviceId，去掉可能的查询参数格式
-        deviceId = cleanDeviceId(deviceId);
-        Session oldSession = deviceId2SessionMap.put(deviceId, session);
+
+        openId = cleanOpenId(openId);
+        log.info("/match - Open ID: {} connected with session ID: {}", openId, session.getId());
+
+        // ✅ 关键修复：在连接建立时，确保用户在数据库中存在
+        if (userService != null) {
+            try {
+                userService.findOrCreateUserByOpenId(openId);
+                log.info("✅ User ensured in database for openId: {}", openId);
+            } catch (Exception e) {
+                log.error("💥 Failed to find or create user for openId: {}", openId, e);
+            }
+        } else {
+            log.error("❌ UserService is not injected. Cannot ensure user existence on connect.");
+        }
+
+        Session oldSession = openId2SessionMap.put(openId, session);
         if (oldSession != null && !oldSession.equals(session)) {
             try {
                 oldSession.close();
+                log.info("Closed old session for openId: {}", openId);
             } catch (IOException e) {
-                log.error("Error closing old session for deviceId: {}", deviceId, e);
+                log.error("Error closing old session for openId: {}", openId, e);
             }
         }
-        log.info("/match - Device ID: {} connected with session ID: {}", deviceId, session.getId());
     }
 
     @OnClose
     public void onClose(Session session) {
-        String deviceId = findDeviceIdBySession(session);
-        if (deviceId == null) {
-            log.warn("/match - No deviceId found in the close request");
+        String openId = findOpenIdBySession(session);
+        if (openId == null) {
+            log.warn("/match - No openId found in the close request");
             return;
         }
-        Session currentSession = deviceId2SessionMap.get(deviceId);
+        Session currentSession = openId2SessionMap.get(openId);
         if (session.equals(currentSession)) {
-            log.info("/match - Device ID: {} disconnected", deviceId);
+            log.info("/match - Open ID: {} disconnected", openId);
             
             // 只处理连接层清理，不直接调用handleLeaveRoom
             // 这样可以避免正常的连接断开（如页面刷新）触发不必要的业务逻辑
-            deviceId2SessionMap.remove(deviceId);
+            openId2SessionMap.remove(openId);
             
             // 检查是否真的需要处理离开房间逻辑
-            Long roomId = deviceId2RoomIdMap.get(deviceId);
+            Long roomId = openId2RoomIdMap.get(openId);
             if (roomId != null) {
                 Room room = rooms.get(roomId);
                 if (room != null && room.getPlayers().size() == 2) {
                     // 只在游戏进行中或等待状态下才通知对方离开
                     // 避免在正常游戏流程中的连接波动造成误报
-                    handlePlayerDisconnect(deviceId);
+                    handlePlayerDisconnect(openId);
                 } else {
                     // 单人房间或房间不存在，直接清理
-                    cleanupPlayerData(deviceId);
+                    cleanupPlayerData(openId);
                 }
             }
         }
@@ -86,18 +121,18 @@ public class WebSocket4Match {
     @OnError
     public void onError(Session session, Throwable throwable) {
         log.error("/match - WebSocket error", throwable);
-        String deviceId = findDeviceIdBySession(session);
-        if (deviceId != null) {
-            deviceId2SessionMap.remove(deviceId);
-            handleLeaveRoom(deviceId);
+        String openId = findOpenIdBySession(session);
+        if (openId != null) {
+            openId2SessionMap.remove(openId);
+            handleLeaveRoom(openId);
         }
     }
 
     @OnMessage
     public void onMessage(String message, Session session) {
-        String deviceId = findDeviceIdBySession(session);
-        if (deviceId == null) {
-            log.warn("/match - No deviceId found in the message request");
+        String openId = findOpenIdBySession(session);
+        if (openId == null) {
+            log.warn("/match - No openId found in the message request");
             return;
         }
         log.info("/match - 收到消息：{}", message);
@@ -108,33 +143,34 @@ public class WebSocket4Match {
             switch (type) {
                 case "join_room":
                     PlayerVO user = JSON.parseObject(message, PlayerVO.class);
-                    if (user.getDeviceId() == null || user.getRoomCode() == null) {
-                        log.error("/match - Invalid join_room message: deviceId or roomCode is null");
+                    if (user.getOpenId() == null || user.getRoomCode() == null) {
+                        log.error("/match - Invalid join_room message: openId or roomCode is null");
                         return;
                     }
+                    // Ensure openId is cleaned before use
+                    user.setOpenId(cleanOpenId(user.getOpenId()));
                     user.setSession(session);
                     user.setSessionId(session.getId());
-                    user.setDeviceId(cleanDeviceId(user.getDeviceId())); // 清洗 deviceId
                     handleJoinRoom(user);
                     break;
                 case "play_card":
-                    if (jsonMessage.getString("deviceId") == null || jsonMessage.getInteger("card") == null) {
-                        log.error("/match - Invalid play_card message: deviceId or card is null");
+                    if (jsonMessage.getString("openId") == null || jsonMessage.getInteger("card") == null) {
+                        log.error("/match - Invalid play_card message: openId or card is null");
                         return;
                     }
-                    handlePlayCard(cleanDeviceId(jsonMessage.getString("deviceId")), jsonMessage.getInteger("card"));
+                    handlePlayCard(cleanOpenId(jsonMessage.getString("openId")), jsonMessage.getInteger("card"));
                     break;
                 case "leave_room":
-                    handleLeaveRoom(deviceId);
+                    handleLeaveRoom(openId);
                     break;
                 case "rematch_request":
-                    handleRematchRequest(deviceId);
+                    handleRematchRequest(openId);
                     break;
                 case "rematch_accept":
-                    handleRematchAccept(deviceId);
+                    handleRematchAccept(openId);
                     break;
                 case "rematch_reject":
-                    handleRematchReject(deviceId);
+                    handleRematchReject(openId);
                     break;
                 default:
                     log.warn("/match - Unknown message type: {}", type);
@@ -144,33 +180,46 @@ public class WebSocket4Match {
         }
     }
 
-    private String findDeviceIdBySession(Session session) {
-        for (Map.Entry<String, Session> entry : deviceId2SessionMap.entrySet()) {
+    private String findOpenIdBySession(Session session) {
+        for (Map.Entry<String, Session> entry : openId2SessionMap.entrySet()) {
             if (entry.getValue().equals(session)) {
-                log.debug("/match - Found deviceId: {} for session: {}", entry.getKey(), session.getId());
+                log.debug("/match - Found openId: {} for session: {}", entry.getKey(), session.getId());
                 return entry.getKey();
             }
         }
-        log.warn("/match - No deviceId found for session: {}", session.getId());
+        log.warn("/match - No openId found for session: {}", session.getId());
         return null;
     }
 
-    // 清洗 deviceId，去掉可能的查询参数格式
-    private String cleanDeviceId(String deviceId) {
-        if (deviceId != null && deviceId.contains("?")) {
-            String[] parts = deviceId.split("\\?deviceId=");
+    // 清洗 openId，去掉可能的查询参数格式
+    private String cleanOpenId(String openId) {
+        if (openId != null && openId.contains("?")) {
+            String[] parts = openId.split("\\?openId=");
             if (parts.length > 0) {
-                deviceId = parts[0];
+                openId = parts[0];
             }
         }
-        return deviceId;
+        return openId;
     }
 
     private void handleJoinRoom(PlayerVO user) {
-        String deviceId = user.getDeviceId();
+        String openId = user.getOpenId();
         String roomCode = user.getRoomCode();
         String nickname = user.getNickName();
-        
+
+        // ✅ 关键修复：在加入房间时，再次确保用户存在，作为双重保障
+        if (userService != null) {
+            try {
+                userService.findOrCreateUserByOpenId(openId);
+                log.info("✅ User ensured in database before joining room for openId: {}", openId);
+            } catch (Exception e) {
+                log.error("💥 Failed to find or create user for openId: {} before joining room", openId, e);
+                // 即使失败，也继续尝试，因为 onOpen 可能已经成功
+            }
+        } else {
+            log.error("❌ UserService is not injected. Cannot ensure user existence on join.");
+        }
+
         // 🔥 昵称内容安全检查
         log.info("🔥 开始检查昵称: {}", nickname);
         if (nickname == null || nickname.trim().isEmpty()) {
@@ -178,7 +227,7 @@ public class WebSocket4Match {
             sendErrorMessage(user.getSession(), "昵称不能为空");
             return;
         }
-        
+
         // 简单的敏感词检查
         String[] sensitiveWords = {"系统", "管理员", "admin", "fuck", "shit", "政府"};
         String lowerNickname = nickname.toLowerCase();
@@ -189,8 +238,21 @@ public class WebSocket4Match {
                 return;
             }
         }
-        
+
         log.info("🔥 昵称检查通过: {}", nickname);
+
+        // Persist the nickname to the database
+        if (userService != null) {
+            try {
+                userService.updateUserNickname(openId, nickname);
+                log.info("✅ Nickname updated successfully for openId: {}", openId);
+            } catch (Exception e) {
+                log.error("💥 Failed to update nickname for openId: {}. This may happen if user creation failed.", openId, e);
+                // 即使更新昵称失败，也允许加入游戏，避免阻塞流程
+            }
+        } else {
+            log.error("❌ UserService is not injected. Cannot update nickname.");
+        }
 
         user.setWinRate(49);
         user.setUserCode(GameUtil.getNextUserCode());
@@ -206,20 +268,20 @@ public class WebSocket4Match {
             }
 
             boolean isReconnect = room.getPlayers().stream()
-                    .anyMatch(p -> p.getDeviceId().equals(deviceId));
+                    .anyMatch(p -> p.getOpenId().equals(openId));
             if (!isReconnect) {
                 user.setRole(GameUtil.RoleEnum.redSide.toString());
                 user.setMsgCode(GameUtil.RED_JOIN_GAME);
                 room.addPlayer(user);
             } else {
                 room.getPlayers().stream()
-                        .filter(p -> p.getDeviceId().equals(deviceId))
+                        .filter(p -> p.getOpenId().equals(openId))
                         .forEach(p -> {
                             p.setSession(user.getSession());
                             p.setSessionId(user.getSessionId());
                         });
             }
-            deviceId2RoomIdMap.put(deviceId, roomId);
+            openId2RoomIdMap.put(openId, roomId);
 
             // 房间满员时发送统一的game_ready消息
             if (room.getPlayers().size() == 2) {
@@ -247,22 +309,22 @@ public class WebSocket4Match {
             room.addPlayer(user);
             rooms.put(roomId, room);
             roomCode2RoomIdMap.put(roomCode, roomId);
-            deviceId2RoomIdMap.put(deviceId, roomId);
+            openId2RoomIdMap.put(openId, roomId);
             
             // 只有一个玩家，发送等待状态
             broadcastRoomState(room);
         }
     }
 
-    private void handlePlayCard(String deviceId, Integer card) {
-        Long roomId = deviceId2RoomIdMap.get(deviceId);
+    private void handlePlayCard(String openId, Integer card) {
+        Long roomId = openId2RoomIdMap.get(openId);
         if (roomId == null) return;
 
         Room room = rooms.get(roomId);
         if (room == null || room.getGameState().isGameCompleted()) return;
 
         String role = room.getPlayers().stream()
-                .filter(p -> p.getDeviceId().equals(deviceId))
+                .filter(p -> p.getOpenId().equals(openId))
                 .findFirst()
                 .map(PlayerVO::getRole)
                 .orElse(null);
@@ -298,9 +360,9 @@ public class WebSocket4Match {
                 if (redPlayer == null || bluePlayer == null) return;
 
                 if (GameState.RESULT_RED_WIN.equals(result)) {
-                    recordGame(roomId, redPlayer.getDeviceId(), bluePlayer.getDeviceId());
+                    recordGame(roomId, redPlayer.getOpenId(), bluePlayer.getOpenId());
                 } else if (GameState.RESULT_BLUE_WIN.equals(result)) {
-                    recordGame(roomId, bluePlayer.getDeviceId(), redPlayer.getDeviceId());
+                    recordGame(roomId, bluePlayer.getOpenId(), redPlayer.getOpenId());
                 }
 
                 JSONObject resultInfo = new JSONObject();
@@ -310,7 +372,7 @@ public class WebSocket4Match {
             }
         } else {
             PlayerVO opponent = room.getPlayers().stream()
-                    .filter(p -> !p.getDeviceId().equals(deviceId))
+                    .filter(p -> !p.getOpenId().equals(openId))
                     .findFirst().orElse(null);
             if (opponent != null) {
                 JSONObject takeTurnInfo = new JSONObject();
@@ -320,29 +382,29 @@ public class WebSocket4Match {
         }
     }
 
-    private void handleLeaveRoom(String deviceId) {
+    private void handleLeaveRoom(String openId) {
         // 防止重复处理同一设备的离开房间请求
-        if (!leavingDeviceIds.add(deviceId)) {
-            log.info("/match - Device {} is already being processed for leaving room, skipping", deviceId);
+        if (!leavingOpenIds.add(openId)) {
+            log.info("/match - openId {} is already being processed for leaving room, skipping", openId);
             return;
         }
         
         try {
-            Long roomId = deviceId2RoomIdMap.get(deviceId);
+            Long roomId = openId2RoomIdMap.get(openId);
             if (roomId == null) {
-                log.info("/match - Device {} not in any room, cleaning up", deviceId);
+                log.info("/match - openId {} not in any room, cleaning up", openId);
                 return;
             }
 
             Room room = rooms.get(roomId);
             if (room == null) {
-                log.info("/match - Room {} not found for device {}, cleaning up", roomId, deviceId);
+                log.info("/match - Room {} not found for openId {}, cleaning up", roomId, openId);
                 return;
             }
 
             // 找到对方玩家
             PlayerVO opponent = room.getPlayers().stream()
-                    .filter(p -> !p.getDeviceId().equals(deviceId))
+                    .filter(p -> !p.getOpenId().equals(openId))
                     .findFirst().orElse(null);
             
             // 只给对方发送离开消息，不要关闭对方连接
@@ -353,36 +415,36 @@ public class WebSocket4Match {
                 try {
                     if (opponent.getSession() != null && opponent.getSession().isOpen()) {
                         GameUtil.sendMessage(opponent.getSession(), response);
-                        log.info("/match - Sent opponent_leave message to deviceId: {}", opponent.getDeviceId());
+                        log.info("/match - Sent opponent_leave message to openId: {}", opponent.getOpenId());
                         // 重要：不要关闭对方连接！让对方自己决定是否离开
                         // opponent.getSession().close(); // 删除这行，避免触发对方的@OnClose
                     }
                 } catch (Exception e) {
-                    log.error("Error sending opponent_leave message to deviceId: {}", opponent.getDeviceId(), e);
+                    log.error("Error sending opponent_leave message to openId: {}", opponent.getOpenId(), e);
                 }
             }
 
             // 只关闭离开者自己的连接
-            Session leaverSession = deviceId2SessionMap.get(deviceId);
+            Session leaverSession = openId2SessionMap.get(openId);
             if (leaverSession != null && leaverSession.isOpen()) {
                 try {
                     leaverSession.close();
-                    log.info("/match - Closed leaver session for deviceId: {}", deviceId);
+                    log.info("/match - Closed leaver session for openId: {}", openId);
                 } catch (Exception e) {
-                    log.error("Error closing leaver session for deviceId: {}", deviceId, e);
+                    log.error("Error closing leaver session for openId: {}", openId, e);
                 }
             }
 
             // 清理离开者的数据
-            deviceId2SessionMap.remove(deviceId);
-            deviceId2RoomIdMap.remove(deviceId);
+            openId2SessionMap.remove(openId);
+            openId2RoomIdMap.remove(openId);
             
             // ✅ 关键修复：从房间玩家列表中移除离开的玩家
-            room.getPlayers().removeIf(p -> p.getDeviceId().equals(deviceId));
+            room.getPlayers().removeIf(p -> p.getOpenId().equals(openId));
             
             // 检查房间是否还有其他在线玩家
             boolean hasOtherPlayers = room.getPlayers().stream()
-                    .anyMatch(p -> deviceId2SessionMap.containsKey(p.getDeviceId()));
+                    .anyMatch(p -> openId2SessionMap.containsKey(p.getOpenId()));
             
             if (!hasOtherPlayers) {
                 // 房间里没有其他在线玩家，完全清理房间
@@ -394,20 +456,20 @@ public class WebSocket4Match {
                     roomCode2RoomIdMap.remove(roomCode);
                 }
                 rooms.remove(roomId);
-                log.info("/match - Room {} cleaned up completely, deviceId {} left", roomId, deviceId);
+                log.info("/match - Room {} cleaned up completely, openId {} left", roomId, openId);
             } else {
                 log.info("/match - Player {} left room {}, room still has {} online players", 
-                        deviceId, roomId, room.getPlayers().size());
+                        openId, roomId, room.getPlayers().size());
             }
         } finally {
             // 无论如何都要从处理集合中移除，避免永久阻塞
-            leavingDeviceIds.remove(deviceId);
+            leavingOpenIds.remove(openId);
         }
     }
 
     private void handleRematchRequest(String requesterId) {
-        log.info("/match - Handling rematch request for deviceId: {}", requesterId);
-        Long roomId = deviceId2RoomIdMap.get(requesterId);
+        log.info("/match - Handling rematch request for openId: {}", requesterId);
+        Long roomId = openId2RoomIdMap.get(requesterId);
         if (roomId == null) {
             log.warn("/match - No room found for requesterId: {}", requesterId);
             return;
@@ -421,10 +483,10 @@ public class WebSocket4Match {
         }
 
         PlayerVO requester = room.getPlayers().stream()
-                .filter(p -> p.getDeviceId().equals(requesterId))
+                .filter(p -> p.getOpenId().equals(requesterId))
                 .findFirst().orElse(null);
         PlayerVO opponent = room.getPlayers().stream()
-                .filter(p -> !p.getDeviceId().equals(requesterId))
+                .filter(p -> !p.getOpenId().equals(requesterId))
                 .findFirst().orElse(null);
         if (requester == null || opponent == null) {
             log.warn("/match - Requester or opponent not found, requesterId: {}", requesterId);
@@ -434,7 +496,7 @@ public class WebSocket4Match {
 
         Session opponentSession = opponent.getSession();
         if (opponentSession == null || !opponentSession.isOpen()) {
-            log.warn("/match - Opponent session not available for deviceId: {}", opponent.getDeviceId());
+            log.warn("/match - Opponent session not available for openId: {}", opponent.getOpenId());
             // 通知请求方对方已离开
             JSONObject response = new JSONObject();
             response.put("type", "opponent_leave");
@@ -449,9 +511,9 @@ public class WebSocket4Match {
         rematchRequest.put("from", requesterId);
         try {
             GameUtil.sendMessage(opponentSession, rematchRequest);
-            log.info("/match - Sent rematch_request to opponent deviceId: {}", opponent.getDeviceId());
+            log.info("/match - Sent rematch_request to opponent openId: {}", opponent.getOpenId());
         } catch (Exception e) {
-            log.error("/match - Failed to send rematch_request to opponent deviceId: {}", opponent.getDeviceId(), e);
+            log.error("/match - Failed to send rematch_request to opponent openId: {}", opponent.getOpenId(), e);
             // 通知请求方对方已离开
             JSONObject response = new JSONObject();
             response.put("type", "opponent_leave");
@@ -461,8 +523,8 @@ public class WebSocket4Match {
         }
     }
 
-    private void handleRematchAccept(String deviceId) {
-        Long roomId = deviceId2RoomIdMap.get(deviceId);
+    private void handleRematchAccept(String openId) {
+        Long roomId = openId2RoomIdMap.get(openId);
         if (roomId == null) return;
 
         Room room = rooms.get(roomId);
@@ -480,10 +542,10 @@ public class WebSocket4Match {
         broadcastToRoom(room, gameReadyMessage);
     }
 
-    private void handleRematchReject(String deviceId) {
-        Long roomId = deviceId2RoomIdMap.get(deviceId);
+    private void handleRematchReject(String openId) {
+        Long roomId = openId2RoomIdMap.get(openId);
         if (roomId == null) {
-            log.warn("/match - No room found for deviceId: {}", deviceId);
+            log.warn("/match - No room found for openId: {}", openId);
             return;
         }
 
@@ -495,22 +557,22 @@ public class WebSocket4Match {
 
         // 找到拒绝方和请求方
         PlayerVO rejecter = room.getPlayers().stream()
-                .filter(p -> p.getDeviceId().equals(deviceId))
+                .filter(p -> p.getOpenId().equals(openId))
                 .findFirst().orElse(null);
         PlayerVO requester = room.getPlayers().stream()
-                .filter(p -> !p.getDeviceId().equals(deviceId))
+                .filter(p -> !p.getOpenId().equals(openId))
                 .findFirst().orElse(null);
         
         if (rejecter == null || requester == null) {
-            log.warn("/match - Rejecter or requester not found for deviceId: {}", deviceId);
+            log.warn("/match - Rejecter or requester not found for openId: {}", openId);
             return;
         }
 
-        log.info("/match - Processing rematch reject: rejecter={}, requester={}", rejecter.getDeviceId(), requester.getDeviceId());
+        log.info("/match - Processing rematch reject: rejecter={}, requester={}", rejecter.getOpenId(), requester.getOpenId());
 
         // 检查请求方的连接状态
         if (requester.getSession() == null || !requester.getSession().isOpen()) {
-            log.info("/match - Requester {} session is not available, no need to send reject message", requester.getDeviceId());
+            log.info("/match - Requester {} session is not available, no need to send reject message", requester.getOpenId());
             // 对方已经断开连接，不需要发送任何消息
             // 拒绝方留在游戏界面，进入复盘模式
             return;
@@ -521,9 +583,9 @@ public class WebSocket4Match {
         response.put("type", "rematch_reject");
         try {
             GameUtil.sendMessage(requester.getSession(), response);
-            log.info("/match - Sent rematch_reject to requester deviceId: {}", requester.getDeviceId());
+            log.info("/match - Sent rematch_reject to requester openId: {}", requester.getOpenId());
         } catch (Exception e) {
-            log.error("/match - Failed to send rematch_reject to requester deviceId: {}", requester.getDeviceId(), e);
+            log.error("/match - Failed to send rematch_reject to requester openId: {}", requester.getOpenId(), e);
             // 发送失败，说明对方连接有问题，但不需要做任何处理
             // 拒绝方仍然留在游戏界面
         }
@@ -554,7 +616,7 @@ public class WebSocket4Match {
             if (session != null && session.isOpen()) {
                 GameUtil.sendMessage(session, message);
             } else {
-                log.warn("/match - Skipping message broadcast to unavailable session for deviceId: {}", player.getDeviceId());
+                log.warn("/match - Skipping message broadcast to unavailable session for openId: {}", player.getOpenId());
             }
         }
     }
@@ -562,6 +624,14 @@ public class WebSocket4Match {
     private void recordGame(Long roomId, String winner, String loser) {
         Room room = rooms.get(roomId);
         if (room == null) return;
+
+        // Update user stats in the database
+        if (userService != null) {
+            userService.updateUserStats(winner, true);
+            userService.updateUserStats(loser, false);
+        } else {
+            log.error("UserService is not injected. Cannot update user stats.");
+        }
 
         GameState gameState = room.getGameState();
         gameState.recordGameResult(winner, loser);
@@ -575,11 +645,11 @@ public class WebSocket4Match {
             JSONObject shareMessage = new JSONObject();
             shareMessage.put("type", "share");
             String winnerName = room.getPlayers().stream()
-                    .filter(p -> p.getDeviceId().equals(winner))
+                    .filter(p -> p.getOpenId().equals(winner))
                     .map(PlayerVO::getNickName)
                     .findFirst().orElse("玩家");
             String loserName = room.getPlayers().stream()
-                    .filter(p -> p.getDeviceId().equals(loser))
+                    .filter(p -> p.getOpenId().equals(loser))
                     .map(PlayerVO::getNickName)
                     .findFirst().orElse("对手");
             String shareCode = "WIN" + winStreak;
@@ -599,7 +669,7 @@ public class WebSocket4Match {
                     break;
             }
 
-            Session winnerSession = deviceId2SessionMap.get(winner);
+            Session winnerSession = openId2SessionMap.get(winner);
             if (winnerSession != null && winnerSession.isOpen()) {
                 GameUtil.sendMessage(winnerSession, shareMessage);
             }
@@ -638,8 +708,8 @@ private long calculateWinStreak(String playerId, Long roomId) {
      * 处理玩家断开连接（业务逻辑层）
      * 只在确实需要时通知对方离开
      */
-    private void handlePlayerDisconnect(String deviceId) {
-        Long roomId = deviceId2RoomIdMap.get(deviceId);
+    private void handlePlayerDisconnect(String openId) {
+        Long roomId = openId2RoomIdMap.get(openId);
         if (roomId == null) return;
 
         Room room = rooms.get(roomId);
@@ -647,7 +717,7 @@ private long calculateWinStreak(String playerId, Long roomId) {
 
         // 找到对方玩家
         PlayerVO opponent = room.getPlayers().stream()
-                .filter(p -> !p.getDeviceId().equals(deviceId))
+                .filter(p -> !p.getOpenId().equals(openId))
                 .findFirst().orElse(null);
         
         // 只给对方发送离开消息，让对方知道连接已断开
@@ -657,32 +727,32 @@ private long calculateWinStreak(String playerId, Long roomId) {
             response.put("message", "对方离开了房间");
             try {
                 GameUtil.sendMessage(opponent.getSession(), response);
-                log.info("/match - Sent opponent_leave message to deviceId: {}", opponent.getDeviceId());
+                log.info("/match - Sent opponent_leave message to openId: {}", opponent.getOpenId());
             } catch (Exception e) {
-                log.error("Error sending opponent_leave message to deviceId: {}", opponent.getDeviceId(), e);
+                log.error("Error sending opponent_leave message to openId: {}", opponent.getOpenId(), e);
             }
         }
 
         // 清理断开连接玩家的数据
-        cleanupPlayerData(deviceId);
+        cleanupPlayerData(openId);
     }
 
     /**
      * 清理玩家数据（资源管理层）
      */
-    private void cleanupPlayerData(String deviceId) {
-        Long roomId = deviceId2RoomIdMap.get(deviceId);
-        deviceId2RoomIdMap.remove(deviceId);
+    private void cleanupPlayerData(String openId) {
+        Long roomId = openId2RoomIdMap.get(openId);
+        openId2RoomIdMap.remove(openId);
         
         if (roomId != null) {
             Room room = rooms.get(roomId);
             if (room != null) {
                 // ✅ 关键修复：先从房间玩家列表中移除离开的玩家
-                room.getPlayers().removeIf(p -> p.getDeviceId().equals(deviceId));
+                room.getPlayers().removeIf(p -> p.getOpenId().equals(openId));
                 
                 // 检查房间是否还有其他在线玩家
                 boolean hasOtherPlayers = room.getPlayers().stream()
-                        .anyMatch(p -> deviceId2SessionMap.containsKey(p.getDeviceId()));
+                        .anyMatch(p -> openId2SessionMap.containsKey(p.getOpenId()));
                 
                 if (!hasOtherPlayers) {
                     // 房间里没有其他在线玩家，清理房间
@@ -694,10 +764,10 @@ private long calculateWinStreak(String playerId, Long roomId) {
                         roomCode2RoomIdMap.remove(roomCode);
                     }
                     rooms.remove(roomId);
-                    log.info("/match - Room {} cleaned up completely, deviceId {} left", roomId, deviceId);
+                    log.info("/match - Room {} cleaned up completely, openId {} left", roomId, openId);
                 } else {
                     log.info("/match - Player {} left room {}, room still has {} online players", 
-                            deviceId, roomId, room.getPlayers().size());
+                            openId, roomId, room.getPlayers().size());
                 }
             }
         }
@@ -742,19 +812,19 @@ class Room {
 
     public void resetPlayerDecks() {
         for (PlayerVO player : players) {
-            playerDecks.put(player.getDeviceId(), new ArrayList<>(
+            playerDecks.put(player.getOpenId(), new ArrayList<>(
                     IntStream.rangeClosed(1, GameState.TEN).boxed().collect(Collectors.toList())
             ));
         }
     }
 
-    public boolean validateCard(String deviceId, Integer card) {
-        List<Integer> deck = playerDecks.get(deviceId);
+    public boolean validateCard(String openId, Integer card) {
+        List<Integer> deck = playerDecks.get(openId);
         return deck != null && deck.contains(card);
     }
 
-    public void removeCard(String deviceId, Integer card) {
-        List<Integer> deck = playerDecks.get(deviceId);
+    public void removeCard(String openId, Integer card) {
+        List<Integer> deck = playerDecks.get(openId);
         if (deck != null) {
             deck.remove(card);
         }

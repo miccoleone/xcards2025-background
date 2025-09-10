@@ -3,11 +3,12 @@ package com.tencard.demo01.saveData;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
 import javax.persistence.*;
 
 @Entity
-@Table(name = "players")
+@Table(name = "users")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -24,15 +25,23 @@ public class UserVO {
     private Long id;
 
     @Column(nullable = false, unique = true)
-    private String deviceId;
+    private String openId;
 
-    @Column(nullable = false, unique = false)
+    @Column
     private String nickName;
 
-    @Column(nullable = false)
+    @Column
     private Integer wins;
 
-    @Column(nullable = false)
+    @Column
     private Integer losses;
 
+    @Column(name = "create_time", updatable = false)
+    @CreationTimestamp
+    private java.time.LocalDateTime createTime;
+
+    // Explicit getter to solve potential Lombok build issues
+    public String getOpenId() {
+        return this.openId;
+    }
 }

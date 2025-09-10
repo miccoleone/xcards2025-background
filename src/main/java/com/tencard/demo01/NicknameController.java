@@ -28,10 +28,10 @@ public class NicknameController {
     @PostMapping("/check-nickname")
     public ResponseEntity<Map<String, Object>> checkNickname(@RequestBody Map<String, String> request) {
         String nickname = request.get("nickname");
-        String deviceId = request.get("deviceId");
-        
+        String openId = request.get("openId");
+
         System.out.println("🔥🔥🔥 检查昵称: " + nickname);
-        System.out.println("🔥🔥🔥 设备ID: " + deviceId);
+        System.out.println("🔥🔥🔥 OpenID: " + openId);
         System.out.println("🔥🔥🔥 使用AppID: " + appId);
         System.out.println("🔥🔥🔥 使用Secret: " + appSecret);
         
@@ -53,8 +53,8 @@ public class NicknameController {
             
             // 获取access_token
             String tokenUrl = String.format(
-                "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s",
-                appId, appSecret
+                    "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s",
+                    appId, appSecret
             );
             
             System.out.println("🌐 Token请求URL: " + tokenUrl);
@@ -73,8 +73,8 @@ public class NicknameController {
                 checkRequest.put("content", nickname);
                 checkRequest.put("version", 2);
                 checkRequest.put("scene", 1);
-                checkRequest.put("openid", deviceId);
-                
+                checkRequest.put("openid", openId);
+
                 System.out.println("📝 内容检查请求: " + checkRequest);
                 Map checkResult = restTemplate.postForObject(checkUrl, checkRequest, Map.class);
                 System.out.println("🎯 内容检查响应: " + checkResult);

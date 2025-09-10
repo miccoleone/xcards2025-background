@@ -11,9 +11,6 @@ public class PlayerVO {
 
     public Long id;
 
-    public String deviceId;
-
-
     public String role; // blueSide|redSide
 
 
@@ -36,7 +33,7 @@ public class PlayerVO {
 
     public transient Session session;
 
-    public String openid;
+    public String openId;
 
     public Integer winRate; // 胜率 49
 
