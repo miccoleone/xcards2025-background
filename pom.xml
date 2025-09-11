@@ -70,7 +70,7 @@
 	<build>
 <!--		<finalName>xcards-online-version 20210821-02</finalName>-->
 <!--		<finalName>xcards2024-match-rooms-20241204</finalName>-->
-		<finalName>xcards2025902</finalName>
+		<finalName>xcards2025911</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
