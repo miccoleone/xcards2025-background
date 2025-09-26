@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>用 Docker 标准化部署 Spring 应用：镜像优化与资源控制</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;padding:24px;line-height:1.65;color:#0f172a;background:#f8fafc}
+    a{color:#2563eb;text-decoration:none}
+    pre{background:#0b1023;color:#e5e7eb;padding:14px;border-radius:8px;overflow:auto}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace}
+    h1{margin-top:0}
+    .container{max-width:900px;margin:0 auto}
+    .muted{color:#64748b}
+    .hr{height:1px;background:#e2e8f0;margin:18px 0}
+    .back{display:inline-block;margin-bottom:12px}
+    ul{margin:0 0 14px 20px}
+    .tip{background:#dbeafe;border:1px solid #3b82f6;padding:12px;border-radius:6px;margin:12px 0}
+    .warning{background:#fef3cd;border:1px solid #f59e0b;padding:12px;border-radius:6px;margin:12px 0}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a class="back" href="/">← 返回首页</a>
+    <h1>用 Docker 标准化部署 Spring 应用：镜像优化与资源控制</h1>
+    <p class="muted">本文介绍如何使用 Docker 容器化部署 Spring Boot 应用，包括多阶段构建、镜像优化、资源限制和生产环境最佳实践。</p>
+
+    <h2>1. 基础 Dockerfile 编写</h2>
+    <p>创建一个标准的 Spring Boot 应用 Dockerfile：</p>
+    <pre><code class="language-dockerfile"># 基础镜像选择
+FROM openjdk:17-jdk-slim
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制 JAR 文件
+COPY target/*.jar app.jar
+
+# 暴露端口
+EXPOSE 8080
+
+# 启动命令
+ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+
+    <h2>2. 多阶段构建优化</h2>
+    <p>使用多阶段构建减少镜像大小，分离构建和运行环境：</p>
+    <pre><code class="language-dockerfile"># 构建阶段
+FROM maven:3.8.6-openjdk-17 AS builder
+
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+
+# 构建应用
+RUN mvn clean package -DskipTests
+
+# 运行阶段
+FROM openjdk:17-jre-slim
+
+WORKDIR /app
+
+# 创建非 root 用户
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# 复制构建产物
+COPY --from=builder /app/target/*.jar app.jar
+
+# 更改文件所有者
+RUN chown appuser:appuser app.jar
+
+# 切换到非 root 用户
+USER appuser
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+
+    <h2>3. JVM 参数优化</h2>
+    <p>针对容器环境优化 JVM 参数：</p>
+    <pre><code class="language-dockerfile"># 优化的启动命令
+ENTRYPOINT ["java", \
+    "-XX:+UseContainerSupport", \
+    "-XX:MaxRAMPercentage=75.0", \
+    "-XX:+UseG1GC", \
+    "-XX:+UseStringDeduplication", \
+    "-Djava.security.egd=file:/dev/./urandom", \
+    "-jar", "app.jar"]</code></pre>
+
+    <div class="tip">
+      <strong>参数说明：</strong>
+      <ul>
+        <li><code>UseContainerSupport</code>：启用容器感知</li>
+        <li><code>MaxRAMPercentage</code>：限制堆内存使用比例</li>
+        <li><code>UseG1GC</code>：使用 G1 垃圾收集器</li>
+        <li><code>UseStringDeduplication</code>：字符串去重优化</li>
+      </ul>
+    </div>
+
+    <h2>4. Docker Compose 配置</h2>
+    <p>使用 Docker Compose 管理应用和依赖服务：</p>
+    <pre><code class="language-yaml">version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/myapp
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=password
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=myapp
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_data:</code></pre>
+
+    <h2>5. 镜像分层优化</h2>
+    <p>优化 Dockerfile 分层结构，提高构建缓存效率：</p>
+    <pre><code class="language-dockerfile">FROM openjdk:17-jre-slim
+
+WORKDIR /app
+
+# 先复制依赖文件（变化较少）
+COPY target/lib ./lib/
+
+# 再复制应用 JAR（变化较多）
+COPY target/*.jar app.jar
+
+# 设置启动脚本
+COPY docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
+
+EXPOSE 8080
+ENTRYPOINT ["./docker-entrypoint.sh"]</code></pre>
+
+    <h2>6. 启动脚本优化</h2>
+    <p>创建灵活的启动脚本 <code>docker-entrypoint.sh</code>：</p>
+    <pre><code class="language-bash">#!/bin/bash
+set -e
+
+# 等待数据库就绪
+if [ -n "$DB_HOST" ]; then
+    echo "Waiting for database..."
+    while ! nc -z $DB_HOST ${DB_PORT:-3306}; do
+        sleep 1
+    done
+    echo "Database is ready!"
+fi
+
+# 动态 JVM 参数
+JAVA_OPTS="${JAVA_OPTS} -XX:+UseContainerSupport"
+
+# 根据容器内存动态设置堆大小
+if [ -n "$MEMORY_LIMIT" ]; then
+    JAVA_OPTS="${JAVA_OPTS} -Xmx${MEMORY_LIMIT}"
+else
+    JAVA_OPTS="${JAVA_OPTS} -XX:MaxRAMPercentage=75.0"
+fi
+
+# 启动应用
+exec java $JAVA_OPTS -jar app.jar "$@"</code></pre>
+
+    <h2>7. 生产环境部署</h2>
+    <p>生产环境的完整部署配置：</p>
+    <pre><code class="language-yaml"># docker-compose.prod.yml
+version: '3.8'
+
+services:
+  app:
+    image: myapp:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - app
+    restart: unless-stopped</code></pre>
+
+    <h2>8. 监控与日志</h2>
+    <p>集成监控和日志收集：</p>
+    <pre><code class="language-yaml">  # 添加到 docker-compose.yml
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  grafana_data:</code></pre>
+
+    <h2>9. 常用运维命令</h2>
+    <pre><code class="language-bash"># 构建镜像
+docker build -t myapp:latest .
+
+# 运行容器
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f app
+
+# 扩容服务
+docker-compose up -d --scale app=3
+
+# 滚动更新
+docker-compose pull app
+docker-compose up -d --no-deps app
+
+# 备份数据
+docker exec mysql_container mysqldump -u root -p myapp > backup.sql
+
+# 监控资源使用
+docker stats
+
+# 清理无用镜像
+docker system prune -a</code></pre>
+
+    <h2>10. 故障排查</h2>
+    <div class="warning">
+      <strong>常见问题：</strong>
+      <ul>
+        <li><strong>内存溢出：</strong>调整 MaxRAMPercentage 或增加容器内存限制</li>
+        <li><strong>启动缓慢：</strong>检查健康检查配置和依赖服务就绪状态</li>
+        <li><strong>网络连接问题：</strong>确认服务间网络配置和端口映射</li>
+        <li><strong>数据持久化：</strong>正确配置 volumes 挂载点</li>
+      </ul>
+    </div>
+
+    <h2>11. 安全最佳实践</h2>
+    <ul>
+      <li>使用非 root 用户运行应用</li>
+      <li>定期更新基础镜像和依赖</li>
+      <li>扫描镜像安全漏洞</li>
+      <li>限制容器资源使用</li>
+      <li>使用 secrets 管理敏感信息</li>
+    </ul>
+
+    <pre><code class="language-bash"># 安全扫描
+docker scan myapp:latest
+
+# 使用 secrets
+echo "db_password" | docker secret create db_password -</code></pre>
+
+    <div class="hr"></div>
+    <p class="muted">以上配置提供了完整的 Docker 化部署方案，可根据具体项目需求进行调整和优化。</p>
+    
+    <footer style="margin:32px 0 24px;color:#64748b;font-size:13px;text-align:center">
+      <div>© <span id="y"></span> studydayday.cn · 代码日记</div>
+      <div style="font-size:13px;color:#10b981">
+        <a href="http://beian.miit.gov.cn/" style="color:#10b981">鄂ICP备2022011881号-2</a>
+      </div>
+      <script>document.getElementById('y').textContent=new Date().getFullYear()</script>
+    </footer>
+  </div>
+</body>
+</html>

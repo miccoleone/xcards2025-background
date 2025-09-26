@@ -2,9 +2,9 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <title>StudyDayDay | 个人软件学习与分享</title>
+  <title>studydayday | 代码日记</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="description" content="StudyDayDay - 个人软件学习博客与技术分享，记录 Java、Spring Boot、WebSocket、云部署与工程化实践经验。">
+  <meta name="description" content="studydayday - 代码日记 Java、Spring Boot、WebSocket、云部署与工程化实践经验。">
   <meta name="keywords" content="学习博客,Java,Spring Boot,WebSocket,云服务器,Nginx,Docker,技术分享">
   <meta name="color-scheme" content="light dark">
   <link rel="icon" href="/favicon.ico">
@@ -55,7 +55,7 @@
 <body>
   <div class="container">
     <nav class="nav">
-      <div class="brand">StudyDayDay</div>
+      <div class="brand">studydayday.cn</div>
       <div>
         <a href="#about">关于</a>
         <a href="#posts">文章</a>
@@ -66,16 +66,23 @@
 
     <section class="hero">
       <h1>记录每一天的进步，分享每一次的收获</h1>
-      <p>这里是个人软件学习与分享的小站，聚焦 Java / Spring Boot / WebSocket / 运维与工程化实践，持续整理高质量的学习笔记与实战文章。</p>
+      <p>这里是个人软件学习与分享的小站，聚焦微信小游戏的的开发与工程化实践，持续整理高质量的学习笔记与实战文章。</p>
       <div class="cta">
         <a class="btn" href="#posts">📚 查看最新文章</a>
       </div>
     </section>
 
     <div class="grid">
+      <div class="card col12">
+        <h3>我的微信小游戏 <span class="badge">扫码体验</span></h3>
+        <div id="wechat-games" style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:16px">
+          <!-- 游戏卡片将通过 JavaScript 动态生成 -->
+        </div>
+      </div>
+
       <div id="about" class="card col6">
         <h3>关于本站</h3>
-        <p class="muted">StudyDayDay.cn 是一个<span class="highlight">个人学习分享</span>向网站，专注于后端开发、网络编程与云端部署相关主题。文章以可复现步骤与清晰代码为特点，帮助读者快速掌握关键技能。</p>
+        <p class="muted">studydayday.cn 是一个个人学习分享向网站，专注于小游戏开发工程实践相关主题。文章以可复现步骤与清晰代码为特点，帮助读者快速掌握关键技能。</p>
         <ul class="list">
           <li>语言与框架：Java、Spring Boot、JPA、WebSocket</li>
           <li>工程与运维：Nginx、Docker、Linux、CI/CD</li>
@@ -115,16 +122,69 @@
 
       <div class="card col12" id="contact">
         <h3>联系与声明</h3>
-        <p class="muted">欢迎交流学习心得与技术问题，邮箱：contact@studydayday.cn（示例）。</p>
-        <p class="muted small">本站用于个人技术学习与经验分享，不涉及运营性活动。</p>
+        <p class="muted">欢迎交流学习心得与技术问题，邮箱：842828087@qq.com。</p>
+        <p class="muted small">本站用于个人技术学习与经验分享。</p>
       </div>
     </div>
 
     <footer class="footer">
-      <div>© <span id="y"></span> StudyDayDay · 个人学习与技术分享网站</div>
-      <div class="small ok">本站支持 HTTPS 访问与安全的 WebSocket (WSS)。</div>
+      <div>© <span id="y"></span> studydayday.cn · 代码日记</div>
+      <div class="small ok">
+        <a href="http://beian.miit.gov.cn/">鄂ICP备2022011881号-2</a>
+      </div>
       <script>document.getElementById('y').textContent=new Date().getFullYear()</script>
     </footer>
   </div>
+
+  <script>
+    // 显示微信小游戏信息
+    function displayWeChatMiniGameInfo() {
+      // 游戏列表 - 按照文件命名规则：序号_游戏名称.jpg
+      const games = [
+        '1_开车狩猎.jpg',
+        '2_坦克大救援.jpg', 
+        '3_智商大作战.jpg',
+        '4_快乐小鸟 2.jpg',
+        '5_方块大逃亡丶坦克来袭.jpg',
+        '6_炸蛋吃货.jpg'
+      ];
+
+      const container = document.getElementById('wechat-games');
+      if (!container) return;
+
+      // 解析并排序游戏
+      const gameInfos = games.map(filename => {
+        const match = filename.match(/^(\d+)_(.+)\.jpg$/);
+        if (match) {
+          return {
+            order: parseInt(match[1]),
+            name: match[2],
+            filename: filename
+          };
+        }
+        return null;
+      }).filter(Boolean).sort((a, b) => a.order - b.order);
+
+      // 生成游戏卡片HTML
+      container.innerHTML = gameInfos.map(game => `
+        <div style="text-align:center;padding:12px;border-radius:12px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);cursor:pointer;overflow:hidden" 
+             onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 32px rgba(56,189,248,.25)';this.style.background='rgba(56,189,248,.12)'" 
+             onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none';this.style.background='rgba(56,189,248,.08)'">
+          <div style="overflow:hidden;border-radius:8px;margin-bottom:8px">
+            <img src="/wxminigame/${game.filename}" 
+                 alt="${game.name}" 
+                 style="width:100px;height:100px;border-radius:8px;object-fit:cover;transition:transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                 onmouseover="this.style.transform='scale(1.1)'" 
+                 onmouseout="this.style.transform='scale(1)'"
+                 onerror="this.style.display='none'">
+          </div>
+          <div style="font-size:14px;color:var(--text);font-weight:500">${game.name}</div>
+        </div>
+      `).join('');
+    }
+
+    // 页面加载完成后显示游戏
+    document.addEventListener('DOMContentLoaded', displayWeChatMiniGameInfo);
+  </script>
 </body>
 </html>
