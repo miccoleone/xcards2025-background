@@ -3,3 +3,6 @@
 .env
 /data/
 /.codebuddy/
+.codebuddy
+**/*.DS_Store
+.DS_Store
