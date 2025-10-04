@@ -40,8 +40,13 @@ public class UserVO {
     @CreationTimestamp
     private java.time.LocalDateTime createTime;
 
-    // Explicit getter to solve potential Lombok build issues
-    public String getOpenId() {
-        return this.openId;
-    }
+    @Column
+    private Long bean;
+
+    @Column
+    private java.time.LocalDate lastSignInDate;
+
+    @Column
+    private Integer totalGames;
+
 }

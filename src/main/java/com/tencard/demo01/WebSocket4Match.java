@@ -285,6 +285,22 @@ public class WebSocket4Match {
 
             // 房间满员时发送统一的game_ready消息
             if (room.getPlayers().size() == 2) {
+                // 检查双方豆子是否充足
+                PlayerVO player1 = room.getPlayers().get(0);
+                PlayerVO player2 = room.getPlayers().get(1);
+                com.tencard.demo01.saveData.UserVO user1 = userService.findOrCreateUserByOpenId(player1.getOpenId());
+                com.tencard.demo01.saveData.UserVO user2 = userService.findOrCreateUserByOpenId(player2.getOpenId());
+
+                Integer betAmount = room.getGameState().getBet();
+                if (user1.getBean() < betAmount || user2.getBean() < betAmount) {
+                    JSONObject errorMsg = new JSONObject();
+                    errorMsg.put("type", "bean_not_enough");
+                    errorMsg.put("message", "有玩家豆子不足，无法开始游戏");
+                    broadcastToRoom(room, errorMsg);
+                    log.warn("Game start failed for room {}: bean not enough.", roomId);
+                    return; // 阻止游戏开始
+                }
+
                 // 准备游戏状态
                 room.getGameState().setRoomId(room.getId());
                 room.resetPlayerDecks();
@@ -530,6 +546,22 @@ public class WebSocket4Match {
         Room room = rooms.get(roomId);
         if (room == null || room.getPlayers().size() != 2) return;
 
+        // 检查双方豆子是否充足
+        PlayerVO player1 = room.getPlayers().get(0);
+        PlayerVO player2 = room.getPlayers().get(1);
+        com.tencard.demo01.saveData.UserVO user1 = userService.findOrCreateUserByOpenId(player1.getOpenId());
+        com.tencard.demo01.saveData.UserVO user2 = userService.findOrCreateUserByOpenId(player2.getOpenId());
+
+        Integer betAmount = room.getGameState().getBet();
+        if (user1.getBean() < betAmount || user2.getBean() < betAmount) {
+            JSONObject errorMsg = new JSONObject();
+            errorMsg.put("type", "bean_not_enough");
+            errorMsg.put("message", "有玩家豆子不足，无法开始连战");
+            broadcastToRoom(room, errorMsg);
+            log.warn("Rematch failed for room {}: bean not enough.", roomId);
+            return; // 阻止连战开始
+        }
+
         // 重置游戏状态并开始新游戏
         room.getGameState().reset();
         room.resetPlayerDecks();
@@ -629,6 +661,12 @@ public class WebSocket4Match {
         if (userService != null) {
             userService.updateUserStats(winner, true);
             userService.updateUserStats(loser, false);
+
+            // 结算豆子
+            Integer betAmount = room.getGameState().getBet();
+            userService.updateUserBean(winner, betAmount);
+            userService.updateUserBean(loser, -betAmount);
+            log.info("Bean settlement: winner {} +{}, loser {} -{}", winner, betAmount, loser, betAmount);
         } else {
             log.error("UserService is not injected. Cannot update user stats.");
         }

@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -29,6 +30,8 @@ public class UserService {
             // 设置新用户的默认值
             user.setWins(0);
             user.setLosses(0);
+            user.setBean(1000L); // 新用户注册时给予1000豆子
+            user.setTotalGames(0);
             user = userRepository.save(user);
         }
         return user;
@@ -38,16 +41,28 @@ public class UserService {
      * 更新用户的昵称。
      * @param openId 用户的唯一标识
      * @param nickname 新的昵称
-     * @return 更新后的用户实体，如果用户不存在则返回 null
+     * @return 更新后的用户实体，如果用户不存在则创建新用户
      */
     public UserVO updateUserNickname(String openId, String nickname) {
+        if(!StringUtils.hasLength(openId) || !StringUtils.hasLength(nickname) || nickname.length() > 20) {
+            return null;
+        }
         UserVO user = userRepository.findByOpenId(openId);
         if (user != null) {
             log.info("Updating nickname for openId: {} to {}", openId, nickname);
             user.setNickName(nickname);
             user = userRepository.save(user);
         } else {
-            log.warn("Attempted to update nickname for non-existent user with openId: {}", openId);
+            // 新建
+            user = new UserVO();
+            user.setOpenId(openId);
+            user.setNickName(nickname);
+            // 设置新用户的默认值
+            user.setWins(0);
+            user.setLosses(0);
+            user.setBean(1000L); // 新用户注册时给予1000豆子
+            user.setTotalGames(0);
+            user = userRepository.save(user);
         }
         return user;
     }
@@ -65,10 +80,27 @@ public class UserService {
             } else {
                 user.setLosses(user.getLosses() + 1);
             }
+            user.setTotalGames(user.getTotalGames() + 1); // 增加总游戏场次计数
             userRepository.save(user);
             log.info("Updated stats for user {}: wins={}, losses={}", openId, user.getWins(), user.getLosses());
         } else {
             log.warn("Attempted to update stats for non-existent user with openId: {}", openId);
+        }
+    }
+
+    /**
+     * 更新用户的豆子数量
+     * @param openId 用户的唯一标识
+     * @param amount 要增加或减少的豆子数量（可以为负数）
+     */
+    public void updateUserBean(String openId, long amount) {
+        UserVO user = userRepository.findByOpenId(openId);
+        if (user != null) {
+            user.setBean(user.getBean() + amount);
+            userRepository.save(user);
+            log.info("Updated bean for user {}: new balance is {}", openId, user.getBean());
+        } else {
+            log.warn("Attempted to update bean for non-existent user with openId: {}", openId);
         }
     }
 

@@ -43,6 +43,7 @@ public class GameState implements Cloneable {
     private String winner;  // 胜利者deviceId
     private String loser;   // 失败者deviceId
     private LocalDateTime gameEndTime;  // 游戏结束时间
+    private Integer bet = 200; // 游戏赌注，默认为200
 
     // 记录当前回合的出牌
     public void addCard(String role, Integer card) {

@@ -1,5 +1,7 @@
 package com.tencard.demo01;
 
+import com.tencard.demo01.saveData.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +20,9 @@ public class NicknameController {
 
     @Value("${wechat.secret}")
     private String appSecret;
+
+    @Autowired
+    private UserService userService;
     
     // 本地敏感词检查
     private static final Pattern SENSITIVE_PATTERN = Pattern.compile(
@@ -96,6 +101,7 @@ public class NicknameController {
                                 System.out.println("✅ 微信API检查通过");
                                 response.put("success", true);
                                 response.put("message", "昵称检查通过");
+                                userService.updateUserNickname(openId, nickname);
                             } else if ("risky".equals(suggest)) {
                                 System.out.println("❌ 微信API检查失败，内容违规");
                                 response.put("success", false);
